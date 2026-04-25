@@ -11,6 +11,8 @@ import org.jsoup.Jsoup
  */
 class HtmlScraper {
     
+    private val verifier = IdentityVerifier()
+
     suspend fun scrapeMugshots(url: String, targetName: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val document = Jsoup.connect(url)
@@ -18,9 +20,7 @@ class HtmlScraper {
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .get()
             
-            // A naive heuristic for an unpredictable reality. 
-            // Assumes the local sheriff bothered to put the text in the DOM and not an image canvas.
-            document.text().contains(targetName, ignoreCase = true)
+            verifier.verifyIdentity(document.text(), targetName)
         } catch (e: Exception) {
             Log.e("HtmlScraper", "Failed to breach the digital perimeter of $url", e)
             false
