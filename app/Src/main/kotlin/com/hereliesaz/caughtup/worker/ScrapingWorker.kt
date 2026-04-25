@@ -6,13 +6,13 @@ import androidx.work.WorkerParameters
 import com.hereliesaz.caughtup.CaughtUpApplication
 import com.hereliesaz.caughtup.data.TargetStatus
 import com.hereliesaz.caughtup.network.HtmlScraper
+import com.hereliesaz.caughtup.network.IdentityVerifier
 import com.hereliesaz.caughtup.network.JurisdictionMapper
 import com.hereliesaz.caughtup.network.WebViewScraper
 import kotlinx.coroutines.flow.first
 
 /**
- * The nocturnal dragnet, now equipped to bypass the digital bouncers.
- * Checks for cuffs, then checks for coffins.
+ * The nocturnal dragnet. Now with object permanence so we don't accidentally bury the living.
  */
 class ScrapingWorker(
     appContext: Context,
@@ -24,6 +24,7 @@ class ScrapingWorker(
         val basicScraper = HtmlScraper()
         val stealthScraper = WebViewScraper(applicationContext)
         val mapper = JurisdictionMapper()
+        val verifier = IdentityVerifier()
         
         val targetsAtLarge = repository.getTargetsByStatus(TargetStatus.AT_LARGE).first()
 
@@ -44,8 +45,9 @@ class ScrapingWorker(
                 val obitUrl = mapper.getObituaryUrl(target.areaCode)
                 if (obitUrl != null) {
                     val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
-                    // A naive search for their name amongst the digital wreaths
-                    if (obitDoc?.text()?.contains(target.displayName, ignoreCase = true) == true) {
+                    val textToSearch = obitDoc?.text() ?: ""
+                    
+                    if (verifier.verifyIdentity(textToSearch, target.displayName)) {
                         newStatus = TargetStatus.DECEASED
                     }
                 }
