@@ -1,8 +1,11 @@
 package com.hereliesaz.caughtup.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,7 +19,10 @@ import com.hereliesaz.caughtup.data.TargetStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TargetListScreen(viewModel: MainViewModel) {
+fun TargetListScreen(
+    viewModel: MainViewModel,
+    onTargetClick: (Int) -> Unit
+) {
     val targets by viewModel.targets.collectAsState()
 
     Scaffold(
@@ -28,6 +34,15 @@ fun TargetListScreen(viewModel: MainViewModel) {
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.triggerManualInterrogation() },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Force Interrogation")
+            }
         }
     ) { paddingValues ->
         if (targets.isEmpty()) {
@@ -48,7 +63,7 @@ fun TargetListScreen(viewModel: MainViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(targets, key = { it.id }) { target ->
-                    TargetItem(target)
+                    TargetItem(target = target, onClick = { onTargetClick(target.id) })
                 }
             }
         }
@@ -56,9 +71,11 @@ fun TargetListScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun TargetItem(target: Target) {
+fun TargetItem(target: Target, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -112,5 +129,3 @@ fun StatusBadge(status: TargetStatus) {
         )
     }
 }
-
-
