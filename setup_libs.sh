@@ -23,14 +23,8 @@ fi
 
 # 2. Download OpenCV
 if [ -d "$TARGET_OPENCV" ]; then
-    echo "[!] OpenCV directory already exists at $TARGET_OPENCV"
-    read -p "Re-download and overwrite? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Skipping OpenCV setup."
-        exit 0
-    fi
-    rm -rf "$TARGET_OPENCV"
+    echo "[!] OpenCV directory already exists at $TARGET_OPENCV. Skipping download."
+    exit 0
 fi
 
 echo "[+] Downloading OpenCV Android SDK ${OPENCV_VERSION}..."
