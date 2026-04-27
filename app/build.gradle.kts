@@ -1,19 +1,45 @@
+import java.util.Properties
+
 plugins {
-    alias(libs.plugins.androidApplication)
-    alias(libs.plugins.jetbrainsKotlinAndroid)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.jetbrains.kotlin.compose)
 }
+
+// Load version properties
+val versionPropsFile = project.rootProject.file("version.properties")
+val versionProps = Properties().apply {
+    if (versionPropsFile.exists()) {
+        versionPropsFile.inputStream().use { load(it) }
+    }
+}
+
+var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
+
+// Automatically increment versionCode for release builds
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+if (isReleaseBuild) {
+    currentVersionCode++
+    versionProps.setProperty("versionBuild", currentVersionCode.toString())
+    versionPropsFile.outputStream().use {
+        versionProps.store(it, "Auto-incremented by release build")
+    }
+}
+
+val verMajor = versionProps.getProperty("versionMajor", "1")
+val verMinor = versionProps.getProperty("versionMinor", "0")
+val verPatch = versionProps.getProperty("versionPatch", "0")
+val currentVersionName = "$verMajor.$verMinor.$verPatch"
 
 android {
     namespace = "com.hereliesaz.caughtup"
-    compileSdk = 34
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.hereliesaz.caughtup"
-        minsdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        minSdk = 26
+        targetSdk = 37
+        versionCode = currentVersionCode
+        versionName = currentVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -34,18 +60,23 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10"
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val version = variant.outputs.first().versionName.get()
+            val code = variant.outputs.first().versionCode.get()
+            val apkName = "CaughtUp-${variant.name}-$version.$code.apk"
+            (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
         }
     }
 }
@@ -55,17 +86,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
 
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.jsoup)
-
-    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }
