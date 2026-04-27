@@ -22,7 +22,7 @@ class HtmlScraper {
             
             verifier.verifyIdentity(document.text(), targetName)
         } catch (e: Exception) {
-            println("Failed to breach the digital perimeter of $url: ${e.message}")
+            Log.e("HtmlScraper", "Failed to breach the digital perimeter of $url", e)
             false
         }
     }
