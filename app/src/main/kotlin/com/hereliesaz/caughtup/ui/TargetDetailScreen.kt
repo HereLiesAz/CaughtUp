@@ -1,4 +1,4 @@
-kepackage com.hereliesaz.caughtup.ui
+package com.hereliesaz.caughtup.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

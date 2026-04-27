@@ -14,7 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.hereliesaz.caughtup.ui.MainViewModel
-import com.hereliesaz.caughtup.ui.TargetListScreen
+import com.hereliesaz.caughtup.ui.CaughtUpApp
 
 class MainActivity : ComponentActivity() {
 
@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     
-                    TargetListScreen(viewModel = viewModel)
+                    CaughtUpApp(viewModel = viewModel)
                 }
             }
         }
