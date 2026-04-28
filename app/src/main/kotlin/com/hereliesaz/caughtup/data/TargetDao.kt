@@ -19,15 +19,14 @@ interface TargetDao {
     fun getTargetsByStatus(status: TargetStatus): Flow<List<Target>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTarget(target: Target)
+    fun insertTarget(target: Target)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTargets(targets: List<Target>)
+    fun insertTargets(targets: List<Target>)
 
     @Update
-    suspend fun updateTarget(target: Target)
+    fun updateTarget(target: Target)
 
     @Query("DELETE FROM targets")
-    suspend fun wipeSlateClean()
+    fun wipeSlateClean()
 }
-
