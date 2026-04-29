@@ -9,17 +9,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cleanunderwear.data.Target
@@ -416,6 +415,10 @@ fun TriStateFilterChip(
 
 @Composable
 fun DiagnosticLogView(logs: List<com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry>) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -424,13 +427,46 @@ fun DiagnosticLogView(logs: List<com.hereliesaz.cleanunderwear.util.DiagnosticLo
         tonalElevation = 8.dp
     ) {
         Column {
-            Text(
-                "UNDER-THE-HOOD ACTIVITY",
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "UNDER-THE-HOOD ACTIVITY",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Row {
+                    IconButton(
+                        onClick = {
+                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                            scope.launch {
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("Intelligence Log", fullLog)))
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Log", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, fullLog)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(intent, "Share Intelligence Log"))
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Log", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
             HorizontalDivider()
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

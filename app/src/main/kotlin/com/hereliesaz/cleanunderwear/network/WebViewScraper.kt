@@ -8,6 +8,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -29,6 +30,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     suspend fun scrapeGhostTown(url: String): Document? = withContext(Dispatchers.Main) {
+        DiagnosticLogger.log("Opening Covert Browser for: $url")
         withTimeoutOrNull(30000L) { // 30 second timeout for the entire operation
             suspendCoroutine { continuation ->
                 val webView = WebView(context)
@@ -38,7 +40,10 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                     if (!isResumed) {
                         isResumed = true
                         continuation.resume(doc)
-                        webView.post { webView.destroy() }
+                        webView.post { 
+                            webView.stopLoading()
+                            webView.destroy() 
+                        }
                     }
                 }
 
@@ -52,6 +57,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                     @JavascriptInterface
                     fun dump(html: String) {
                         try {
+                            DiagnosticLogger.log("Intelligence extracted from DOM.")
                             resumeOnce(Jsoup.parse(html))
                         } catch (e: Exception) {
                             resumeOnce(null)
@@ -63,6 +69,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
 
                 webView.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
+                        DiagnosticLogger.log("Covert page loaded. Analyzing content...")
                         view?.postDelayed({
                             try {
                                 view.evaluateJavascript(
@@ -72,7 +79,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                             } catch (e: Exception) {
                                 resumeOnce(null)
                             }
-                        }, 5000) 
+                        }, 1000) // Reduced delay
                     }
                     
                     override fun onReceivedHttpError(
@@ -81,6 +88,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                         errorResponse: WebResourceResponse?
                     ) {
                         if (request?.isForMainFrame == true && errorResponse?.statusCode != 200 && errorResponse?.statusCode != 403) {
+                           DiagnosticLogger.log("Intelligence Alert: Source returned HTTP ${errorResponse?.statusCode}", DiagnosticLogger.LogEntry.LogLevel.WARN)
                            resumeOnce(null)
                         }
                     }
@@ -91,6 +99,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                         description: String?,
                         failingUrl: String?
                     ) {
+                        DiagnosticLogger.log("Intelligence Alert: Web failure ($errorCode: $description)", DiagnosticLogger.LogEntry.LogLevel.ERROR)
                         resumeOnce(null)
                     }
                 }

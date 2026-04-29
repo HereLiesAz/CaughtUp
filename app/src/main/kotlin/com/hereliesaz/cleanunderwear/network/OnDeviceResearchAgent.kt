@@ -31,7 +31,9 @@ class OnDeviceResearchAgent @Inject constructor(
         try {
             val modelBuffer = loadModelFile("research_agent.tflite")
             interpreter = Interpreter(modelBuffer)
+            DiagnosticLogger.log("Intelligence Agent: Model loaded successfully.")
         } catch (e: Exception) {
+            DiagnosticLogger.log("Intelligence Agent Error: Failed to load LiteRT model. ${e.message}", DiagnosticLogger.LogEntry.LogLevel.ERROR)
             interpreter = null
         }
         loadAssets()
@@ -65,16 +67,21 @@ class OnDeviceResearchAgent @Inject constructor(
     fun validatePersonName(text: String): Boolean {
         if (text.isBlank() || text == "Unnamed Entity") return false
         
-        // We use the same scoring model. If it scores high enough as a "relevant entity",
-        // and doesn't contain obvious service-related keywords, we consider it a name.
+        // Secondary Heuristic: A real name usually has at least one space and no numbers
+        val hasSpace = text.trim().contains(" ")
+        val hasNoDigits = text.none { it.isDigit() }
+        val looksLikeName = hasSpace && hasNoDigits
+
         val score = scoreWithModel(text)
         
-        val serviceKeywords = listOf("customer", "service", "support", "help", "bank", "office", "pizza", "taxi")
+        val serviceKeywords = listOf("customer", "service", "support", "help", "bank", "office", "pizza", "taxi", "delivery", "store")
         val isService = serviceKeywords.any { text.contains(it, ignoreCase = true) }
         
-        val isValid = score > 0.3f && !isService
+        // If AI gives 0.0, we rely on the looksLikeName heuristic to avoid total failure
+        val isValid = if (score == 0.0f) looksLikeName else (score > 0.3f && !isService)
+
         if (!isValid) {
-            DiagnosticLogger.log("AI Flag: '$text' interrogated and rejected as likely service/entity (Score: $score)")
+            DiagnosticLogger.log("AI Flag: '$text' interrogated and rejected. (Score: $score, Heuristic: $looksLikeName)")
         }
         
         return isValid
@@ -165,17 +172,29 @@ class OnDeviceResearchAgent @Inject constructor(
     }
 
     private fun scoreWithModel(text: String): Float {
-        if (interpreter == null) return 0f
+        if (interpreter == null) {
+            // If model is missing, we allow everything as a fallback to avoid total failure
+            return 1.0f 
+        }
 
-        // The TextVectorization layer is inside the model, so we pass the raw string.
+        // Many LiteRT models expect input as [1, SequenceLength] or similar.
+        // If the model has an internal TextVectorization layer that accepts String,
+        // it might require a specific data type (e.g. Byte array)
+        
         val input = arrayOf(text)
         val output = Array(1) { FloatArray(1) }
 
         try {
             interpreter?.run(input, output)
-            return output[0][0]
+            val score = output[0][0]
+            // If we are getting exactly 0.0, something might be wrong with inference
+            if (score == 0.0f) {
+                DiagnosticLogger.log("Inference Insight: Model returned 0.0 for '$text'. Investigation required.", DiagnosticLogger.LogEntry.LogLevel.DEBUG)
+            }
+            return score
         } catch (e: Exception) {
-            return 0f
+            DiagnosticLogger.log("Inference Error: ${e.message}", DiagnosticLogger.LogEntry.LogLevel.ERROR)
+            return 0.5f // Neutral fallback on error
         }
     }
 }
