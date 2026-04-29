@@ -32,7 +32,7 @@ class ScrapingWorker(
             var newStatus = TargetStatus.AT_LARGE
 
             // 1. Interrogate the municipal cages
-            val lockupUrl = mapper.getLockupUrl(target.areaCode)
+            val lockupUrl = mapper.getLockupUrl(target.areaCode, target.residenceInfo)
             if (lockupUrl != null) {
                 val isIncarcerated = basicScraper.scrapeMugshots(lockupUrl, target.displayName)
                 if (isIncarcerated) {
@@ -42,7 +42,7 @@ class ScrapingWorker(
 
             // 2. If they aren't in a cell, check if they are in the ground
             if (newStatus == TargetStatus.AT_LARGE) {
-                val obitUrl = mapper.getObituaryUrl(target.areaCode)
+                val obitUrl = mapper.getObituaryUrl(target.areaCode, target.residenceInfo)
                 if (obitUrl != null) {
                     val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
                     val textToSearch = obitDoc?.text() ?: ""

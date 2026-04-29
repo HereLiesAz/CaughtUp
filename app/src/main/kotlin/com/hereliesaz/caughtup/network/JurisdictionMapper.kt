@@ -6,7 +6,21 @@ package com.hereliesaz.caughtup.network
  */
 class JurisdictionMapper {
 
-    fun getLockupUrl(areaCode: String): String? {
+    fun getLockupUrl(areaCode: String, residenceInfo: String? = null): String? {
+        val lowerResidence = residenceInfo?.lowercase() ?: ""
+
+        if (lowerResidence.contains("new orleans") || Regex("\\bla\\b").containsMatchIn(lowerResidence) || lowerResidence.contains("louisiana")) {
+             if (areaCode == "504" || lowerResidence.contains("new orleans")) {
+                 return "https://opso.us/docket/"
+             }
+             if (areaCode == "985" || lowerResidence.contains("st. tammany") || lowerResidence.contains("covington") || lowerResidence.contains("slidell")) {
+                 return "https://www.stpso.com/inmate-roster/"
+             }
+             if (areaCode == "225" || lowerResidence.contains("baton rouge")) {
+                 return "https://www.brla.gov/prison/"
+             }
+        }
+
         return when (areaCode) {
             "504" -> "https://opso.us/docket/"
             "985" -> "https://www.stpso.com/inmate-roster/" // Just in case they fled across the lake.
@@ -15,7 +29,15 @@ class JurisdictionMapper {
         }
     }
 
-    fun getObituaryUrl(areaCode: String): String? {
+    fun getObituaryUrl(areaCode: String, residenceInfo: String? = null): String? {
+         val lowerResidence = residenceInfo?.lowercase() ?: ""
+
+         if (lowerResidence.contains("new orleans") || Regex("\\bla\\b").containsMatchIn(lowerResidence) || lowerResidence.contains("louisiana")) {
+             if (areaCode == "504" || lowerResidence.contains("new orleans")) {
+                 return "https://obits.nola.com/us/obituaries/nola/browse"
+             }
+         }
+
          return when (areaCode) {
             "504" -> "https://obits.nola.com/us/obituaries/nola/browse"
             else -> null
