@@ -20,7 +20,7 @@ class JurisdictionMapper {
     fun getLockupUrl(areaCode: String, residenceInfo: String? = null): String? {
         val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-        if (isLouisiana(lowerResidence)) {
+        if (isLouisiana(residenceInfo)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://opso.us/docket/"
              }
@@ -43,7 +43,7 @@ class JurisdictionMapper {
     fun getObituaryUrl(areaCode: String, residenceInfo: String? = null): String? {
          val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-         if (isLouisiana(lowerResidence)) {
+         if (isLouisiana(residenceInfo)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://obits.nola.com/us/obituaries/nola/browse"
              }

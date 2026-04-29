@@ -32,7 +32,6 @@ abstract class CaughtUpDatabase : RoomDatabase() {
                     "caughtup_database"
                 )
                 .addMigrations(MIGRATION_1_2)
-                .fallbackToDestructiveMigration()
                 .build()
                 .also { Instance = it }
             }
