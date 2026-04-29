@@ -11,9 +11,9 @@ data class Target(
     @ColumnInfo(name = "display_name")
     val displayName: String,
     @ColumnInfo(name = "phone_number")
-    val phoneNumber: String,
+    val phoneNumber: String? = null,
     @ColumnInfo(name = "area_code")
-    val areaCode: String,
+    val areaCode: String? = null,
     @ColumnInfo(name = "jurisdiction")
     val jurisdiction: String? = null,
     @ColumnInfo(name = "status")
@@ -35,7 +35,9 @@ data class Target(
     @ColumnInfo(name = "last_status_change_timestamp")
     val lastStatusChangeTimestamp: Long = 0L,
     @ColumnInfo(name = "last_verification_snippet")
-    val lastVerificationSnippet: String? = null
+    val lastVerificationSnippet: String? = null,
+    @ColumnInfo(name = "email")
+    val email: String? = null
 )
 
 enum class TargetStatus {

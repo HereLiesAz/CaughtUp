@@ -8,6 +8,7 @@ import com.hereliesaz.cleanunderwear.network.IdentityVerifier
 import com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
 import com.hereliesaz.cleanunderwear.network.WebViewScraper
 import com.hereliesaz.cleanunderwear.ui.NotificationHelper
+import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import com.hereliesaz.cleanunderwear.util.SystemContactSyncer
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -29,20 +30,33 @@ class ScrapeTargetsUseCase @Inject constructor(
 ) {
     private val semaphore = Semaphore(3) // Only 3 concurrent "interrogations" to avoid detection
 
-    suspend operator fun invoke() = coroutineScope {
+    suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }) = coroutineScope {
         val allTargets = repository.getAllTargets().first()
         val now = System.currentTimeMillis()
+        
+        val targetsToProcess = allTargets.filter { 
+            it.status != TargetStatus.IGNORED && it.nextScheduledCheck <= now 
+        }
+        
+        if (targetsToProcess.isEmpty()) {
+            onProgress(1f, "Registry is up to date.")
+            return@coroutineScope
+        }
 
-        allTargets
-            .filter { it.status != TargetStatus.IGNORED && it.nextScheduledCheck <= now }
-            .map { target ->
-                async {
-                    semaphore.withPermit {
-                        processTarget(target, now)
-                    }
+        val total = targetsToProcess.size
+        var completedCount = 0
+
+        targetsToProcess.map { target ->
+            async {
+                semaphore.withPermit {
+                    completedCount++
+                    onProgress(completedCount.toFloat() / total, "Interrogating ${target.displayName}...")
+                    processTarget(target, now)
                 }
             }
-            .awaitAll()
+        }.awaitAll()
+        
+        onProgress(1f, "Daily vigil completed.")
     }
 
     private suspend fun processTarget(target: Target, now: Long) {
@@ -57,9 +71,12 @@ class ScrapeTargetsUseCase @Inject constructor(
                 discoveredLockupUrl = it
             }
             
+            DiagnosticLogger.log("Checking jail roster for ${target.displayName} at $lockupUrl")
+            
             // Note: Updated HtmlScraper to return result
             val lockupResult = basicScraper.scrapeMugshots(lockupUrl, target.displayName)
             if (lockupResult.isMatch) {
+                DiagnosticLogger.log("MATCH FOUND: ${target.displayName} located in local jail.", DiagnosticLogger.LogEntry.LogLevel.WARN)
                 newStatus = TargetStatus.INCARCERATED
                 verificationSnippet = lockupResult.snippet
             }
@@ -70,10 +87,13 @@ class ScrapeTargetsUseCase @Inject constructor(
                     discoveredObitUrl = it
                 }
                 
+                DiagnosticLogger.log("Checking obituary registry for ${target.displayName} at $obitUrl")
+                
                 val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
                 if (obitDoc != null) {
                     val result = verifier.verifyIdentity(obitDoc.text(), target.displayName)
                     if (result.isMatch) {
+                        DiagnosticLogger.log("DEATH DETECTED: ${target.displayName} found in obituary registry.", DiagnosticLogger.LogEntry.LogLevel.WARN)
                         newStatus = TargetStatus.DECEASED
                         verificationSnippet = result.snippet
                     }

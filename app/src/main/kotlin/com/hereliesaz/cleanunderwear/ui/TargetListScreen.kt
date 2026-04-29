@@ -2,13 +2,19 @@ package com.hereliesaz.cleanunderwear.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,60 +30,115 @@ import kotlinx.coroutines.launch
 @Composable
 fun TargetListScreen(
     viewModel: MainViewModel,
-    onTargetClick: (Int) -> Unit
+    onTargetClick: (Int) -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val targets by viewModel.targets.collectAsState()
+    val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
+    val showDiagnosticLog by viewModel.showDiagnosticLog.collectAsState()
+    val operationState by viewModel.operationState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showIgnored by viewModel.showIgnored.collectAsState()
+    val namelessFilter by viewModel.showNamelessFilter.collectAsState()
+    val emailOnlyFilter by viewModel.showEmailOnlyFilter.collectAsState()
+    val hasEmailFilter by viewModel.hasEmailFilter.collectAsState()
+    val hasAddressFilter by viewModel.hasAddressFilter.collectAsState()
+    val googleFilter by viewModel.googleFilter.collectAsState()
+    val metaFilter by viewModel.metaFilter.collectAsState()
+    val appleFilter by viewModel.appleFilter.collectAsState()
+    val deviceFilter by viewModel.deviceFilter.collectAsState()
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
     val selectedTargetForActions = targets.find { it.id == selectedTargetIdForActions }
     val sheetState = rememberModalBottomSheetState()
+    
+    var showManualEntryDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("The Registry") },
-                actions = {
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
-                    }
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        MainViewModel.SortOrder.entries.forEach { order ->
+            Column {
+                TopAppBar(
+                    title = { Text("The Registry") },
+                    actions = {
+                        IconButton(onClick = { viewModel.sweepContacts() }) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = "Harvest Contacts")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            MainViewModel.SortOrder.entries.forEach { order ->
+                                DropdownMenuItem(
+                                    text = { Text("Sort by ${order.name.lowercase().replaceFirstChar { it.uppercase() }}") },
+                                    onClick = { 
+                                        viewModel.setSortOrder(order)
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
+                            HorizontalDivider()
                             DropdownMenuItem(
-                                text = { Text("Sort by ${order.name.lowercase().replaceFirstChar { it.uppercase() }}") },
+                                text = { Text(if (showIgnored) "Hide Ignored" else "Show Ignored") },
                                 onClick = { 
-                                    viewModel.setSortOrder(order)
+                                    viewModel.toggleShowIgnored()
                                     showSortMenu = false
                                 }
                             )
                         }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text(if (showIgnored) "Hide Ignored" else "Show Ignored") },
-                            onClick = { 
-                                viewModel.toggleShowIgnored()
-                                showSortMenu = false
-                            }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+
+                if (operationState.isRunning) {
+                    LinearProgressIndicator(
+                        progress = { if (operationState.progress >= 0f) operationState.progress else 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.secondary,
+                        trackColor = MaterialTheme.colorScheme.secondaryContainer,
+                    )
+                    
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Text(
+                            text = operationState.description,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
+                }
+            }
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.triggerManualInterrogation() },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Force Interrogation")
+            Column(horizontalAlignment = Alignment.End) {
+                FloatingActionButton(
+                    onClick = { showManualEntryDialog = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = "Manual Entry")
+                }
+                
+                FloatingActionButton(
+                    onClick = { viewModel.triggerManualInterrogation() },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Force Interrogation")
+                }
             }
         }
     ) { paddingValues ->
@@ -93,21 +154,64 @@ fun TargetListScreen(
                 shape = MaterialTheme.shapes.medium
             )
 
-            val selectedSources by viewModel.selectedSources.collectAsState()
-            
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("Google", "Meta", "Apple", "Local").forEach { source ->
-                    FilterChip(
-                        selected = selectedSources.contains(if (source == "Local") "Device" else source),
-                        onClick = { viewModel.toggleSource(if (source == "Local") "Device" else source) },
-                        label = { Text(source) }
-                    )
-                }
+                // Account Source Filters
+                TriStateFilterChip(
+                    state = googleFilter,
+                    onToggle = { viewModel.setGoogleFilter(it) },
+                    label = "Google"
+                )
+                TriStateFilterChip(
+                    state = metaFilter,
+                    onToggle = { viewModel.setMetaFilter(it) },
+                    label = "Meta"
+                )
+                TriStateFilterChip(
+                    state = appleFilter,
+                    onToggle = { viewModel.setAppleFilter(it) },
+                    label = "Apple"
+                )
+                TriStateFilterChip(
+                    state = deviceFilter,
+                    onToggle = { viewModel.setDeviceFilter(it) },
+                    label = "Local"
+                )
+
+                VerticalDivider(modifier = Modifier.height(32.dp).align(Alignment.CenterVertically))
+
+                // Nameless Filter
+                TriStateFilterChip(
+                    state = namelessFilter,
+                    onToggle = { viewModel.setNamelessFilter(it) },
+                    label = "Nameless"
+                )
+                
+                // Email Only Filter
+                TriStateFilterChip(
+                    state = emailOnlyFilter,
+                    onToggle = { viewModel.setEmailOnlyFilter(it) },
+                    label = "Email Only"
+                )
+
+                // Has Email Filter
+                TriStateFilterChip(
+                    state = hasEmailFilter,
+                    onToggle = { viewModel.setEmailFilter(it) },
+                    label = "Email"
+                )
+                
+                // Has Address Filter
+                TriStateFilterChip(
+                    state = hasAddressFilter,
+                    onToggle = { viewModel.setAddressFilter(it) },
+                    label = "Address"
+                )
             }
 
             if (targets.isEmpty()) {
@@ -119,7 +223,7 @@ fun TargetListScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -132,7 +236,21 @@ fun TargetListScreen(
                     }
                 }
             }
+
+            if (showDiagnosticLog) {
+                DiagnosticLogView(logs = diagnosticLogs)
+            }
         }
+    }
+
+    if (showManualEntryDialog) {
+        ManualEntryDialog(
+            onDismiss = { showManualEntryDialog = false },
+            onConfirm = { name, phone, email ->
+                viewModel.addManualTarget(name, phone, email)
+                showManualEntryDialog = false
+            }
+        )
     }
 
     if (selectedTargetForActions != null) {
@@ -224,20 +342,177 @@ fun TargetItem(target: Target, onClick: () -> Unit, onLongClick: () -> Unit) {
                     fontWeight = FontWeight.Bold, 
                     style = MaterialTheme.typography.bodyLarge
                 )
-                Text(
-                    text = target.phoneNumber, 
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Text(
-                    text = "Area Code: ${target.areaCode}", 
-                    style = MaterialTheme.typography.bodySmall, 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                target.phoneNumber?.let {
+                    Text(
+                        text = it, 
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                target.email?.let {
+                    Text(
+                        text = it, 
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                target.areaCode?.let {
+                    if (it != "LOCAL") {
+                        Text(
+                            text = "Area Code: $it", 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "Local Number", 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
             }
             
             StatusBadge(status = target.status)
         }
     }
+}
+
+@Composable
+fun TriStateFilterChip(
+    state: Boolean?,
+    onToggle: (Boolean?) -> Unit,
+    label: String
+) {
+    FilterChip(
+        selected = state != null,
+        onClick = {
+            val nextState = when (state) {
+                null -> true   // Only
+                true -> false  // Exclude
+                false -> null  // All
+            }
+            onToggle(nextState)
+        },
+        label = {
+            Text(
+                text = when (state) {
+                    true -> "Only $label"
+                    false -> "No $label"
+                    null -> label
+                }
+            )
+        },
+        leadingIcon = if (state != null) {
+            {
+                Icon(
+                    imageVector = if (state) Icons.Default.Check else Icons.Default.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize)
+                )
+            }
+        } else null
+    )
+}
+
+@Composable
+fun DiagnosticLogView(logs: List<com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry>) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+        tonalElevation = 8.dp
+    ) {
+        Column {
+            Text(
+                "UNDER-THE-HOOD ACTIVITY",
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                items(logs) { entry ->
+                    val color = when (entry.level) {
+                        com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.ERROR -> MaterialTheme.colorScheme.error
+                        com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.WARN -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Text(
+                        text = "[${entry.timestamp}] ${entry.message}",
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = androidx.compose.ui.unit.TextUnit.Unspecified, // Uses default which is fine
+                            color = color
+                        ),
+                        modifier = Modifier.padding(vertical = 1.dp),
+                        fontSize = MaterialTheme.typography.labelSmall.fontSize
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ManualEntryDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String?, String?) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manual Intelligence Ingestion") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Manually add a target that Meta or Apple refuses to sync with this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Target Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone Number") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Intelligence Email") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    onConfirm(name, phone.takeIf { it.isNotBlank() }, email.takeIf { it.isNotBlank() })
+                },
+                enabled = name.isNotBlank() && (phone.isNotBlank() || email.isNotBlank())
+            ) {
+                Text("Ingest Target")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

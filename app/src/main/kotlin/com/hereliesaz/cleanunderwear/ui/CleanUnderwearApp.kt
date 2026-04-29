@@ -35,7 +35,16 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                     viewModel = viewModel,
                     onTargetClick = { targetId ->
                         navController.navigate("targetDetail/$targetId")
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("settings")
                     }
+                )
+            }
+            composable("settings") {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(

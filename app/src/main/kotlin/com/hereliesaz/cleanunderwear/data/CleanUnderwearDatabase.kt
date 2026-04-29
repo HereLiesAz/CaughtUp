@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * The physical manifestation of your localized surveillance state.
  */
-@Database(entities = [Target::class], version = 5, exportSchema = false)
+@Database(entities = [Target::class], version = 6, exportSchema = false)
 abstract class CleanUnderwearDatabase : RoomDatabase() {
     abstract fun targetDao(): TargetDao
 
@@ -45,6 +45,54 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. Create the new table with correct nullability and the new 'email' column
+                database.execSQL("""
+                    CREATE TABLE targets_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        display_name TEXT NOT NULL,
+                        phone_number TEXT,
+                        area_code TEXT,
+                        jurisdiction TEXT,
+                        status TEXT NOT NULL,
+                        last_scraped_timestamp INTEGER NOT NULL,
+                        source_account TEXT,
+                        residence_info TEXT,
+                        lockup_url TEXT,
+                        obituary_url TEXT,
+                        check_frequency_hours INTEGER NOT NULL,
+                        next_scheduled_check INTEGER NOT NULL,
+                        last_status_change_timestamp INTEGER NOT NULL,
+                        last_verification_snippet TEXT,
+                        email TEXT
+                    )
+                """.trimIndent())
+
+                // 2. Copy data from the old table
+                database.execSQL("""
+                    INSERT INTO targets_new (
+                        id, display_name, phone_number, area_code, jurisdiction, status, 
+                        last_scraped_timestamp, source_account, residence_info, lockup_url, 
+                        obituary_url, check_frequency_hours, next_scheduled_check, 
+                        last_status_change_timestamp, last_verification_snippet
+                    )
+                    SELECT 
+                        id, display_name, phone_number, area_code, jurisdiction, status, 
+                        last_scraped_timestamp, source_account, residence_info, lockup_url, 
+                        obituary_url, check_frequency_hours, next_scheduled_check, 
+                        last_status_change_timestamp, last_verification_snippet
+                    FROM targets
+                """.trimIndent())
+
+                // 3. Drop the old table
+                database.execSQL("DROP TABLE targets")
+
+                // 4. Rename the new table
+                database.execSQL("ALTER TABLE targets_new RENAME TO targets")
+            }
+        }
+
         fun getDatabase(context: Context): CleanUnderwearDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -52,7 +100,7 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
                     CleanUnderwearDatabase::class.java,
                     "cleanunderwear_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
                 .also { Instance = it }
             }

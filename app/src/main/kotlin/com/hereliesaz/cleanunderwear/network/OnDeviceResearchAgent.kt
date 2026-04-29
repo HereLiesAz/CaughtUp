@@ -1,6 +1,7 @@
 package com.hereliesaz.cleanunderwear.network
 
 import android.content.Context
+import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -58,6 +59,27 @@ class OnDeviceResearchAgent @Inject constructor(
         return nicknames[name.lowercase()] ?: emptyList()
     }
 
+    /**
+     * Uses the LiteRT model to determine if the provided text is likely a human name.
+     */
+    fun validatePersonName(text: String): Boolean {
+        if (text.isBlank() || text == "Unnamed Entity") return false
+        
+        // We use the same scoring model. If it scores high enough as a "relevant entity",
+        // and doesn't contain obvious service-related keywords, we consider it a name.
+        val score = scoreWithModel(text)
+        
+        val serviceKeywords = listOf("customer", "service", "support", "help", "bank", "office", "pizza", "taxi")
+        val isService = serviceKeywords.any { text.contains(it, ignoreCase = true) }
+        
+        val isValid = score > 0.3f && !isService
+        if (!isValid) {
+            DiagnosticLogger.log("AI Flag: '$text' interrogated and rejected as likely service/entity (Score: $score)")
+        }
+        
+        return isValid
+    }
+
     private fun loadModelFile(fileName: String): MappedByteBuffer {
         val fileDescriptor = context.assets.openFd(fileName)
         val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
@@ -66,9 +88,10 @@ class OnDeviceResearchAgent @Inject constructor(
     }
 
 
-    suspend fun getDynamicLockupUrl(areaCode: String, residenceInfo: String? = null): String {
-        val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $areaCode"
-        val stateTriggers = triggers.values.find { it.area_codes.contains(areaCode) }
+    suspend fun getDynamicLockupUrl(areaCode: String?, residenceInfo: String? = null): String {
+        val safeAreaCode = areaCode ?: "000"
+        val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $safeAreaCode"
+        val stateTriggers = triggers.values.find { it.area_codes.contains(safeAreaCode) }
         
         val siteConstraint = stateTriggers?.priority_sources?.joinToString(" OR ") { "site:$it" } ?: ""
         val query = if (siteConstraint.isNotBlank()) {
@@ -78,14 +101,15 @@ class OnDeviceResearchAgent @Inject constructor(
         }
         
         val fallback = stateTriggers?.priority_sources?.firstOrNull { it.contains(".gov") || it.contains(".us") }
-            ?: "https://www.google.com/search?q=inmate+roster+$areaCode"
+            ?: "https://www.google.com/search?q=inmate+roster+$safeAreaCode"
             
         return executeAiSearch(query, fallback)
     }
 
-    suspend fun getDynamicObituaryUrl(areaCode: String, residenceInfo: String? = null): String {
-        val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $areaCode"
-        val stateTriggers = triggers.values.find { it.area_codes.contains(areaCode) }
+    suspend fun getDynamicObituaryUrl(areaCode: String?, residenceInfo: String? = null): String {
+        val safeAreaCode = areaCode ?: "000"
+        val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $safeAreaCode"
+        val stateTriggers = triggers.values.find { it.area_codes.contains(safeAreaCode) }
         
         val query = "obituary \"$locationQuery\""
         val fallback = stateTriggers?.priority_sources?.find { it.contains("obituaries") } 

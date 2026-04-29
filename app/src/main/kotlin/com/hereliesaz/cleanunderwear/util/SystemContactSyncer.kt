@@ -21,7 +21,8 @@ class SystemContactSyncer @Inject constructor(@ApplicationContext private val co
      */
     fun syncToSystem(target: Target) {
         try {
-            val contactId = findContactIdByPhone(target.phoneNumber) ?: return
+            val phone = target.phoneNumber ?: return
+            val contactId = findContactIdByPhone(phone) ?: return
             
             val statusText = when (target.status) {
                 TargetStatus.MONITORING -> "Monitoring"

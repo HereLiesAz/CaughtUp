@@ -50,8 +50,13 @@ fun TargetDetailScreen(
             
             HorizontalDivider()
 
-            DetailRow(label = "Contact Number", value = target.phoneNumber)
-            DetailRow(label = "Location Reference", value = target.areaCode)
+            DetailRow(label = "Intelligence Name", value = target.displayName)
+            
+            HorizontalDivider()
+
+            target.phoneNumber?.let { DetailRow(label = "Contact Number", value = it) }
+            target.email?.let { DetailRow(label = "Intelligence Email", value = it) }
+            target.areaCode?.let { DetailRow(label = "Location Reference", value = it) }
             if (!target.residenceInfo.isNullOrBlank()) {
                 DetailRow(label = "Known Home Area", value = target.residenceInfo)
             }

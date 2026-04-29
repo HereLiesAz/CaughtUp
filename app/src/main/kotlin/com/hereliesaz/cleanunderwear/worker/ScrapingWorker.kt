@@ -3,6 +3,7 @@ package com.hereliesaz.cleanunderwear.worker
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.hereliesaz.cleanunderwear.domain.ScrapeTargetsUseCase
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -30,7 +31,9 @@ class ScrapingWorker(
         )
         val scrapeTargetsUseCase = entryPoint.scrapeTargetsUseCase()
 
-        scrapeTargetsUseCase()
+        scrapeTargetsUseCase { progress, description ->
+            setProgressAsync(workDataOf("progress" to progress, "description" to description))
+        }
 
         return Result.success()
     }
