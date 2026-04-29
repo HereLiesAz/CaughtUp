@@ -35,12 +35,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        val permissionsToRequest = mutableListOf(Manifest.permission.READ_CONTACTS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        
-        requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        // Initialize GitHub Crash Reporting
+        setupCrashReporting()
+
+        checkAndRequestPermissions()
 
         setContent {
             MaterialTheme {

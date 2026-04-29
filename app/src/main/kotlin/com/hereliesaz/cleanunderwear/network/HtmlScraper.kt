@@ -17,24 +17,24 @@ class HtmlScraper @Inject constructor(
     private val verifier: IdentityVerifier
 ) {
 
-    suspend fun scrapeMugshots(url: String, targetName: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun scrapeMugshots(url: String, targetName: String): IdentityVerifier.VerificationResult = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url(url)
                 // Disguising our automated dragnet as a bored human on a desktop.
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build()
-
+ 
             val response = okHttpClient.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext false
+            if (!response.isSuccessful) return@withContext IdentityVerifier.VerificationResult(false, null)
             
-            val html = response.body?.string() ?: return@withContext false
+            val html = response.body?.string() ?: return@withContext IdentityVerifier.VerificationResult(false, null)
             val document = Jsoup.parse(html)
             
             verifier.verifyIdentity(document.text(), targetName)
         } catch (e: Exception) {
             Log.e("HtmlScraper", "Failed to breach the digital perimeter of $url", e)
-            false
+            IdentityVerifier.VerificationResult(false, null)
         }
     }
 }

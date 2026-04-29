@@ -10,6 +10,12 @@ import com.hereliesaz.cleanunderwear.ui.NotificationHelper
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+ 
 class ScrapeTargetsUseCase @Inject constructor(
     private val repository: TargetRepository,
     private val basicScraper: HtmlScraper,
@@ -18,41 +24,56 @@ class ScrapeTargetsUseCase @Inject constructor(
     private val verifier: IdentityVerifier,
     private val notifications: NotificationHelper
 ) {
-    suspend operator fun invoke() {
+    private val semaphore = Semaphore(3) // Only 3 concurrent "interrogations" to avoid detection
+
+    suspend operator fun invoke() = coroutineScope {
         val allTargets = repository.getAllTargets().first()
         val now = System.currentTimeMillis()
 
-        allTargets.forEach { target ->
-            // Skip ignored targets and those not yet due
-            if (target.status == TargetStatus.IGNORED || target.nextScheduledCheck > now) return@forEach
+        allTargets
+            .filter { it.status != TargetStatus.IGNORED && it.nextScheduledCheck <= now }
+            .map { target ->
+                async {
+                    semaphore.withPermit {
+                        processTarget(target, now)
+                    }
+                }
+            }
+            .awaitAll()
+    }
 
+    private suspend fun processTarget(target: Target, now: Long) {
+        try {
             var newStatus = TargetStatus.AT_LARGE
             var discoveredLockupUrl = target.lockupUrl
             var discoveredObitUrl = target.obituaryUrl
+            var verificationSnippet = target.lastVerificationSnippet
 
             // 1. Interrogate the municipal cages
             val lockupUrl = target.lockupUrl ?: researchAgent.getDynamicLockupUrl(target.areaCode, target.residenceInfo).also {
                 discoveredLockupUrl = it
             }
-            val isIncarcerated = basicScraper.scrapeMugshots(lockupUrl, target.displayName)
-            if (isIncarcerated) {
+            
+            // Note: Updated HtmlScraper to return result
+            val lockupResult = basicScraper.scrapeMugshots(lockupUrl, target.displayName)
+            if (lockupResult.isMatch) {
                 newStatus = TargetStatus.INCARCERATED
+                verificationSnippet = lockupResult.snippet
             }
 
             // 2. If they aren't in a cell, check if they are in the ground
-            var verificationSnippet = target.lastVerificationSnippet
-            
             if (newStatus == TargetStatus.AT_LARGE) {
                 val obitUrl = target.obituaryUrl ?: researchAgent.getDynamicObituaryUrl(target.areaCode, target.residenceInfo).also {
                     discoveredObitUrl = it
                 }
-                val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
-                val textToSearch = obitDoc?.text() ?: ""
                 
-                val result = verifier.verifyIdentity(textToSearch, target.displayName)
-                if (result.isMatch) {
-                    newStatus = TargetStatus.DECEASED
-                    verificationSnippet = result.snippet
+                val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
+                if (obitDoc != null) {
+                    val result = verifier.verifyIdentity(obitDoc.text(), target.displayName)
+                    if (result.isMatch) {
+                        newStatus = TargetStatus.DECEASED
+                        verificationSnippet = result.snippet
+                    }
                 }
             }
 
@@ -75,6 +96,8 @@ class ScrapeTargetsUseCase @Inject constructor(
                     lastVerificationSnippet = verificationSnippet
                 )
             )
+        } catch (e: Exception) {
+            android.util.Log.e("ScrapeUseCase", "The void refused to yield data for ${target.displayName}", e)
         }
     }
 }
