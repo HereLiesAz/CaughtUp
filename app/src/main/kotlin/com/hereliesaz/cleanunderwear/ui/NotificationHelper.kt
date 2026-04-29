@@ -2,7 +2,6 @@ package com.hereliesaz.cleanunderwear.ui
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingCorner
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -50,7 +49,7 @@ class NotificationHelper @Inject constructor(private val context: Context) {
         val statusText = when (target.status) {
             TargetStatus.INCARCERATED -> "has been incarcerated."
             TargetStatus.DECEASED -> "has passed away."
-            TargetStatus.AT_LARGE -> "is back at large."
+            TargetStatus.MONITORING -> "is back under monitoring."
             else -> "status has changed to ${target.status}."
         }
 

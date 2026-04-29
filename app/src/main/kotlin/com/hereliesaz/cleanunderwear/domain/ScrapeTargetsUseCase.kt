@@ -1,5 +1,6 @@
 package com.hereliesaz.cleanunderwear.domain
 
+import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.network.HtmlScraper
@@ -7,6 +8,7 @@ import com.hereliesaz.cleanunderwear.network.IdentityVerifier
 import com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
 import com.hereliesaz.cleanunderwear.network.WebViewScraper
 import com.hereliesaz.cleanunderwear.ui.NotificationHelper
+import com.hereliesaz.cleanunderwear.util.SystemContactSyncer
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -45,7 +47,7 @@ class ScrapeTargetsUseCase @Inject constructor(
 
     private suspend fun processTarget(target: Target, now: Long) {
         try {
-            var newStatus = TargetStatus.AT_LARGE
+            var newStatus = TargetStatus.MONITORING
             var discoveredLockupUrl = target.lockupUrl
             var discoveredObitUrl = target.obituaryUrl
             var verificationSnippet = target.lastVerificationSnippet
@@ -63,7 +65,7 @@ class ScrapeTargetsUseCase @Inject constructor(
             }
 
             // 2. If they aren't in a cell, check if they are in the ground
-            if (newStatus == TargetStatus.AT_LARGE) {
+            if (newStatus == TargetStatus.MONITORING) {
                 val obitUrl = target.obituaryUrl ?: researchAgent.getDynamicObituaryUrl(target.areaCode, target.residenceInfo).also {
                     discoveredObitUrl = it
                 }

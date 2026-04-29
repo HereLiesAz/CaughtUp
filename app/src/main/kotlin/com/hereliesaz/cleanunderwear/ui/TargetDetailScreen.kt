@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cleanunderwear.data.Target
+import com.hereliesaz.cleanunderwear.data.TargetStatus
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -25,7 +26,6 @@ fun TargetDetailScreen(
     val context = LocalContext.current
     Scaffold(
         topBar = {
-            TopAppBar(
             TopAppBar(
                 title = { Text("Details: ${target.displayName}") },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -139,7 +139,7 @@ fun TargetDetailScreen(
                                 onClick = { 
                                     // Rejected: Move back to monitoring
                                     onUpdateTarget(target.copy(
-                                        status = TargetStatus.AT_LARGE,
+                                        status = TargetStatus.MONITORING,
                                         lastVerificationSnippet = null
                                     ))
                                 }

@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetRepository
+import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.domain.HarvestContactsUseCase
 import com.hereliesaz.cleanunderwear.domain.SetupSourcesUseCase
 import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import androidx.core.content.edit
 
 /**
  * The puppet master. Now capable of forcing the issue for the chronically impatient.
@@ -122,7 +124,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun completeOnboarding() {
-        prefs.edit().putBoolean("onboarding_done", true).apply()
+        prefs.edit {putBoolean("onboarding_done", true)}
         _isOnboardingCompleted.value = true
     }
 

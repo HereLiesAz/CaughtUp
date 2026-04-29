@@ -1,14 +1,14 @@
 package com.hereliesaz.cleanunderwear.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,13 +40,13 @@ fun TargetListScreen(
                 title = { Text("The Registry") },
                 actions = {
                     IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Default.Sort, contentDescription = "Sort")
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
                     }
                     DropdownMenu(
                         expanded = showSortMenu,
                         onDismissRequest = { showSortMenu = false }
                     ) {
-                        MainViewModel.SortOrder.values().forEach { order ->
+                        MainViewModel.SortOrder.entries.forEach { order ->
                             DropdownMenuItem(
                                 text = { Text("Sort by ${order.name.lowercase().replaceFirstChar { it.uppercase() }}") },
                                 onClick = { 
@@ -55,7 +55,7 @@ fun TargetListScreen(
                                 }
                             )
                         }
-                        Divider()
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text(if (showIgnored) "Hide Ignored" else "Show Ignored") },
                             onClick = { 
@@ -103,7 +103,7 @@ fun TargetListScreen(
             ) {
                 listOf("Google", "Meta", "Apple", "Local").forEach { source ->
                     FilterChip(
-                        selected = selectedSources.contains(source == "Local" ? "Device" : source),
+                        selected = selectedSources.contains(if (source == "Local") "Device" else source),
                         onClick = { viewModel.toggleSource(if (source == "Local") "Device" else source) },
                         label = { Text(source) }
                     )
@@ -243,7 +243,7 @@ fun TargetItem(target: Target, onClick: () -> Unit, onLongClick: () -> Unit) {
 @Composable
 fun StatusBadge(status: TargetStatus) {
     val (color, text) = when (status) {
-        TargetStatus.AT_LARGE -> MaterialTheme.colorScheme.primary to "Monitoring"
+        TargetStatus.MONITORING -> MaterialTheme.colorScheme.primary to "Monitoring"
         TargetStatus.INCARCERATED -> MaterialTheme.colorScheme.error to "Incarcerated"
         TargetStatus.DECEASED -> MaterialTheme.colorScheme.outline to "Deceased"
         TargetStatus.IGNORED -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f) to "Archived"

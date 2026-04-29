@@ -17,7 +17,7 @@ data class Target(
     @ColumnInfo(name = "jurisdiction")
     val jurisdiction: String? = null,
     @ColumnInfo(name = "status")
-    val status: TargetStatus = TargetStatus.AT_LARGE,
+    val status: TargetStatus = TargetStatus.MONITORING,
     @ColumnInfo(name = "last_scraped_timestamp")
     val lastScrapedTimestamp: Long = 0L,
     @ColumnInfo(name = "source_account")
@@ -39,7 +39,7 @@ data class Target(
 )
 
 enum class TargetStatus {
-    AT_LARGE,
+    MONITORING,
     INCARCERATED,
     DECEASED,
     IGNORED,

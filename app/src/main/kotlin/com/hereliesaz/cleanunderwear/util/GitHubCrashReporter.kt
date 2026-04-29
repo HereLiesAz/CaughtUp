@@ -20,7 +20,7 @@ class GitHubCrashReporter(private val context: Context) {
     
     // In a real production environment, this would be an encrypted secret or fetched from a secure vault.
     // For this implementation, we scaffold the mechanism.
-    private val GITHUB_TOKEN = "" 
+    private val GITHUB_TOKEN = "secrets.GH_TOKEN"
 
     fun reportCrash(throwable: Throwable) {
         if (GITHUB_TOKEN.isBlank()) {

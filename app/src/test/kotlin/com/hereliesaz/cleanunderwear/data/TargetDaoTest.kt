@@ -6,12 +6,12 @@ import org.junit.Assert.assertEquals
 class TargetDaoTest {
 
     @Test
-    fun target_defaultStatus_isAtLarge() {
+    fun target_defaultStatus_isMonitoring() {
         val target = Target(
             displayName = "John Doe",
             phoneNumber = "555-1234",
             areaCode = "555"
         )
-        assertEquals(TargetStatus.AT_LARGE, target.status)
+        assertEquals(TargetStatus.MONITORING, target.status)
     }
 }
