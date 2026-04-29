@@ -13,6 +13,7 @@ interface TargetRepository {
     suspend fun insertTarget(target: Target)
     suspend fun insertTargets(targets: List<Target>)
     suspend fun updateTarget(target: Target)
+    suspend fun deleteTarget(target: Target)
     suspend fun wipeSlateClean()
 }
 
@@ -22,5 +23,6 @@ class OfflineTargetRepository(private val targetDao: TargetDao) : TargetReposito
     override suspend fun insertTarget(target: Target) = withContext(Dispatchers.IO) { targetDao.insertTarget(target) }
     override suspend fun insertTargets(targets: List<Target>) = withContext(Dispatchers.IO) { targetDao.insertTargets(targets) }
     override suspend fun updateTarget(target: Target) = withContext(Dispatchers.IO) { targetDao.updateTarget(target) }
+    override suspend fun deleteTarget(target: Target) = withContext(Dispatchers.IO) { targetDao.deleteTarget(target) }
     override suspend fun wipeSlateClean() = withContext(Dispatchers.IO) { targetDao.wipeSlateClean() }
 }

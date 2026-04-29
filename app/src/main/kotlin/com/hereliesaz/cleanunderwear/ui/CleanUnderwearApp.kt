@@ -39,6 +39,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 if (target != null) {
                     TargetDetailScreen(
                         target = target,
+                        onUpdateTarget = { viewModel.updateTarget(it) },
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

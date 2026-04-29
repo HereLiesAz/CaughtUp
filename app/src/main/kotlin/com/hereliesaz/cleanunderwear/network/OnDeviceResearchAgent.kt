@@ -1,6 +1,8 @@
 package com.hereliesaz.cleanunderwear.network
 
 import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -10,29 +12,50 @@ import java.nio.channels.FileChannel
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * The tiny on-device research AI.
- * It uses a LiteRT (TFLite) text classifier to score search results 
- * and deduce the official municipal roster or obituary URL.
- */
 @Singleton
 class OnDeviceResearchAgent @Inject constructor(
     @ApplicationContext private val context: Context,
     private val scraper: WebViewScraper
 ) {
     private var interpreter: Interpreter? = null
-    private var vocabMap: Map<String, Int> = emptyMap()
+    private var triggers: Map<String, TriggerState> = emptyMap()
+    private var nicknames: Map<String, List<String>> = emptyMap()
+
+    data class TriggerState(
+        val area_codes: List<String>,
+        val priority_sources: List<String>
+    )
 
     init {
         try {
             val modelBuffer = loadModelFile("research_agent.tflite")
             interpreter = Interpreter(modelBuffer)
-            loadVocab("research_agent_vocab.txt")
         } catch (e: Exception) {
-            // Model isn't trained/placed yet.
-            // Run `python3 scripts/train_research_ai.py` to generate it.
             interpreter = null
         }
+        loadAssets()
+    }
+
+    private fun loadAssets() {
+        try {
+            val gson = Gson()
+            
+            // Load Triggers
+            val triggerJson = context.assets.open("scraper_triggers.json").bufferedReader().use { it.readText() }
+            val triggerType = object : TypeToken<Map<String, TriggerState>>() {}.type
+            triggers = gson.fromJson(triggerJson, triggerType)
+
+            // Load Nicknames
+            val nicknameJson = context.assets.open("nicknames.json").bufferedReader().use { it.readText() }
+            val nicknameType = object : TypeToken<Map<String, List<String>>>() {}.type
+            nicknames = gson.fromJson(nicknameJson, nicknameType)
+        } catch (e: Exception) {
+            // Fallback to empty if assets are missing
+        }
+    }
+
+    fun getNicknames(name: String): List<String> {
+        return nicknames[name.lowercase()] ?: emptyList()
     }
 
     private fun loadModelFile(fileName: String): MappedByteBuffer {
@@ -42,27 +65,33 @@ class OnDeviceResearchAgent @Inject constructor(
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, fileDescriptor.startOffset, fileDescriptor.declaredLength)
     }
 
-    private fun loadVocab(fileName: String) {
-        try {
-            val lines = context.assets.open(fileName).bufferedReader().readLines()
-            vocabMap = lines.mapIndexed { index, word -> word to index }.toMap()
-        } catch (e: Exception) {
-            vocabMap = emptyMap()
-        }
-    }
 
     suspend fun getDynamicLockupUrl(areaCode: String, residenceInfo: String? = null): String {
         val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $areaCode"
-        val query = "\"inmate roster\" OR \"arrest log\" \"$locationQuery\""
+        val stateTriggers = triggers.values.find { it.area_codes.contains(areaCode) }
         
-        return executeAiSearch(query, "https://opso.us/docket/") // fallback
+        val siteConstraint = stateTriggers?.priority_sources?.joinToString(" OR ") { "site:$it" } ?: ""
+        val query = if (siteConstraint.isNotBlank()) {
+            "($siteConstraint) \"inmate roster\" OR \"arrest log\" \"$locationQuery\""
+        } else {
+            "\"inmate roster\" OR \"arrest log\" \"$locationQuery\""
+        }
+        
+        val fallback = stateTriggers?.priority_sources?.firstOrNull { it.contains(".gov") || it.contains(".us") }
+            ?: "https://www.google.com/search?q=inmate+roster+$areaCode"
+            
+        return executeAiSearch(query, fallback)
     }
 
     suspend fun getDynamicObituaryUrl(areaCode: String, residenceInfo: String? = null): String {
         val locationQuery = residenceInfo?.takeIf { it.isNotBlank() } ?: "Area Code $areaCode"
-        val query = "obituary \"$locationQuery\""
+        val stateTriggers = triggers.values.find { it.area_codes.contains(areaCode) }
         
-        return executeAiSearch(query, "https://obits.nola.com/us/obituaries/nola/browse") // fallback
+        val query = "obituary \"$locationQuery\""
+        val fallback = stateTriggers?.priority_sources?.find { it.contains("obituaries") } 
+            ?: "https://www.legacy.com/obituaries"
+        
+        return executeAiSearch(query, fallback)
     }
 
     private suspend fun executeAiSearch(query: String, fallbackUrl: String): String {
@@ -91,7 +120,7 @@ class OnDeviceResearchAgent @Inject constructor(
         if (candidates.isEmpty()) return fallbackUrl
 
         // 3. Use LiteRT ML Model to Score the candidates
-        if (interpreter != null && vocabMap.isNotEmpty()) {
+        if (interpreter != null) {
             var bestUrl = fallbackUrl
             var bestScore = -1f
 
@@ -112,22 +141,15 @@ class OnDeviceResearchAgent @Inject constructor(
     }
 
     private fun scoreWithModel(text: String): Float {
-        // Tokenize text using the loaded vocab (max length 20 to match model)
-        val tokens = text.lowercase().replace(Regex("[^a-z0-9\\s]"), "").split("\\s+".toRegex())
-        val inputArray = IntArray(20) { 0 }
-        
-        for (i in 0 until minOf(tokens.size, 20)) {
-            inputArray[i] = vocabMap[tokens[i]] ?: 1 // 1 is usually OOV token
-        }
+        if (interpreter == null) return 0f
 
-        // The model expects a 2D array [batch_size, sequence_length] of floats (or ints if supported directly, but let's cast to float array for TF Lite standard if needed, actually TextVectorization outputs int64, so float32 or int32 depending on export). 
-        // We'll use IntArray since TextVectorization outputs Ints.
-        val inputBuffer = Array(1) { inputArray }
-        val outputBuffer = Array(1) { FloatArray(1) }
+        // The TextVectorization layer is inside the model, so we pass the raw string.
+        val input = arrayOf(text)
+        val output = Array(1) { FloatArray(1) }
 
         try {
-            interpreter?.run(inputBuffer, outputBuffer)
-            return outputBuffer[0][0]
+            interpreter?.run(input, output)
+            return output[0][0]
         } catch (e: Exception) {
             return 0f
         }

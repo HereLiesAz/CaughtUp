@@ -136,4 +136,5 @@ dependencies {
 
     // On-Device AI
     implementation(libs.litert)
+    implementation(libs.litert.tensorflow.ops)
 }

@@ -1,21 +1,23 @@
 package com.hereliesaz.cleanunderwear.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,11 +26,43 @@ fun TargetListScreen(
     onTargetClick: (Int) -> Unit
 ) {
     val targets by viewModel.targets.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val showIgnored by viewModel.showIgnored.collectAsState()
+    var showSortMenu by remember { mutableStateOf(false) }
+    var selectedTargetForActions by remember { mutableStateOf<Target?>(null) }
+    val sheetState = rememberModalBottomSheetState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("The Ledger") },
+                title = { Text("The Registry") },
+                actions = {
+                    IconButton(onClick = { showSortMenu = true }) {
+                        Icon(Icons.Default.Sort, contentDescription = "Sort")
+                    }
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        MainViewModel.SortOrder.values().forEach { order ->
+                            DropdownMenuItem(
+                                text = { Text("Sort by ${order.name.lowercase().replaceFirstChar { it.uppercase() }}") },
+                                onClick = { 
+                                    viewModel.setSortOrder(order)
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                        Divider()
+                        DropdownMenuItem(
+                            text = { Text(if (showIgnored) "Hide Ignored" else "Show Ignored") },
+                            onClick = { 
+                                viewModel.toggleShowIgnored()
+                                showSortMenu = false
+                            }
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -45,37 +79,135 @@ fun TargetListScreen(
             }
         }
     ) { paddingValues ->
-        if (targets.isEmpty()) {
-            Box(
+        Column(modifier = Modifier.padding(paddingValues)) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.setSearchQuery(it) },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues), 
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No suspects acquired. The panopticon is currently blind.")
-            }
-        } else {
-            LazyColumn(
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Find someone...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                shape = MaterialTheme.shapes.medium
+            )
+
+            val selectedSources by viewModel.selectedSources.collectAsState()
+            
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(targets, key = { it.id }) { target ->
-                    TargetItem(target = target, onClick = { onTargetClick(target.id) })
+                listOf("Google", "Meta", "Apple", "Local").forEach { source ->
+                    FilterChip(
+                        selected = selectedSources.contains(source == "Local" ? "Device" : source),
+                        onClick = { viewModel.toggleSource(if (source == "Local") "Device" else source) },
+                        label = { Text(source) }
+                    )
                 }
             }
+
+            if (targets.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("The registry is currently empty.")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(targets, key = { it.id }) { target ->
+                        TargetItem(
+                            target = target, 
+                            onClick = { onTargetClick(target.id) },
+                            onLongClick = { selectedTargetForActions = target }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (selectedTargetForActions != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedTargetForActions = null },
+            sheetState = sheetState
+        ) {
+            TargetActionMenu(
+                target = selectedTargetForActions!!,
+                onAction = { action ->
+                    // Handle actions (e.g., navigate to detail for "sites" or "frequency")
+                    selectedTargetForActions = null
+                },
+                viewModel = viewModel
+            )
         }
     }
 }
 
 @Composable
-fun TargetItem(target: Target, onClick: () -> Unit) {
+fun TargetActionMenu(
+    target: Target,
+    onAction: (String) -> Unit,
+    viewModel: MainViewModel
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+    ) {
+        if (target.status == TargetStatus.IGNORED) {
+            ListItem(
+                headlineContent = { Text("Resume Monitoring") },
+                modifier = Modifier.clickable { 
+                    viewModel.restoreTarget(target)
+                    onAction("restore")
+                }
+            )
+        } else {
+            ListItem(
+                headlineContent = { Text("Archive & Stop Monitoring") },
+                modifier = Modifier.clickable { 
+                    viewModel.ignoreTarget(target)
+                    onAction("ignore")
+                }
+            )
+        }
+        ListItem(
+            headlineContent = { Text("Update Information") },
+            modifier = Modifier.clickable { onAction("update") }
+        )
+        ListItem(
+            headlineContent = { Text("View Source Accounts") },
+            supportingContent = { Text(target.sourceAccount ?: "Unknown") },
+            modifier = Modifier.clickable { onAction("sources") }
+        )
+        ListItem(
+            headlineContent = { Text("View Verification Sites") },
+            modifier = Modifier.clickable { onAction("sites") }
+        )
+        ListItem(
+            headlineContent = { Text("Change Frequency (${target.checkFrequencyHours}h)") },
+            modifier = Modifier.clickable { onAction("frequency") }
+        )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun TargetItem(target: Target, onClick: () -> Unit, onLongClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -110,10 +242,11 @@ fun TargetItem(target: Target, onClick: () -> Unit) {
 @Composable
 fun StatusBadge(status: TargetStatus) {
     val (color, text) = when (status) {
-        TargetStatus.AT_LARGE -> MaterialTheme.colorScheme.primary to "At Large"
+        TargetStatus.AT_LARGE -> MaterialTheme.colorScheme.primary to "Monitoring"
         TargetStatus.INCARCERATED -> MaterialTheme.colorScheme.error to "Incarcerated"
         TargetStatus.DECEASED -> MaterialTheme.colorScheme.outline to "Deceased"
-        TargetStatus.UNKNOWN -> MaterialTheme.colorScheme.secondary to "M.I.A."
+        TargetStatus.IGNORED -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f) to "Archived"
+        TargetStatus.UNKNOWN -> MaterialTheme.colorScheme.secondary to "Checking..."
     }
 
     Surface(

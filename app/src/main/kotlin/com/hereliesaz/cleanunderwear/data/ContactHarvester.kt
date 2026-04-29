@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
  */
 class ContactHarvester(private val contentResolver: ContentResolver) {
 
-    suspend fun harvestContacts(): List<Target> = withContext(Dispatchers.IO) {
+    suspend fun harvestContacts(allowedAccountTypes: Set<String> = emptySet()): List<Target> = withContext(Dispatchers.IO) {
         val contactDataMap = mutableMapOf<Long, ContactData>()
         val projection = arrayOf(
             ContactsContract.Data.CONTACT_ID,
@@ -59,15 +59,18 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
 
                 val contactData = contactDataMap.getOrPut(contactId) { ContactData(displayName) }
 
-                if (accountType != null) {
-                    val mappedAccount = when {
-                        accountType.contains("google", ignoreCase = true) -> "Google"
-                        accountType.contains("facebook", ignoreCase = true) -> "Facebook"
-                        accountType.contains("whatsapp", ignoreCase = true) -> "WhatsApp"
-                        accountType.contains("apple", ignoreCase = true) -> "Apple"
-                        else -> "Device Contacts"
-                    }
+                val mappedAccount = when {
+                    accountType?.contains("google", ignoreCase = true) == true -> "Google"
+                    accountType?.contains("facebook", ignoreCase = true) == true || 
+                    accountType?.contains("whatsapp", ignoreCase = true) == true -> "Meta"
+                    accountType?.contains("apple", ignoreCase = true) == true -> "Apple"
+                    else -> "Device"
+                }
+
+                if (allowedAccountTypes.isEmpty() || allowedAccountTypes.contains(mappedAccount)) {
                     contactData.accounts.add(mappedAccount)
+                } else {
+                    continue
                 }
 
                 when (mimeType) {

@@ -27,6 +27,9 @@ interface TargetDao {
     @Update
     fun updateTarget(target: Target)
 
+    @androidx.room.Delete
+    fun deleteTarget(target: Target)
+
     @Query("DELETE FROM targets")
     fun wipeSlateClean()
 }

@@ -2,6 +2,7 @@ package com.hereliesaz.cleanunderwear
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,16 +23,24 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val contactsGranted = permissions[Manifest.permission.READ_CONTACTS] ?: false
+        if (contactsGranted) {
             viewModel.sweepContacts()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        val permissionsToRequest = mutableListOf(Manifest.permission.READ_CONTACTS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
 
         setContent {
             MaterialTheme {
@@ -40,15 +49,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     LaunchedEffect(Unit) {
-                        if (ContextCompat.checkSelfPermission(
-                                this@MainActivity,
-                                Manifest.permission.READ_CONTACTS
-                            ) == PackageManager.PERMISSION_GRANTED
-                        ) {
-                            viewModel.sweepContacts()
-                        } else {
-                            requestPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                        }
+                        viewModel.scheduleDailyPanopticon()
                     }
                     
                     CleanUnderwearApp(viewModel = viewModel)
