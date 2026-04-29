@@ -1,6 +1,6 @@
-# CaughtUp
+# CleanUnderwear
 
-CaughtUp is a modern Android application built using Kotlin and Jetpack Compose. It aims to provide an intuitive and seamless user experience with a robust underlying architecture.
+CleanUnderwear is a modern Android application built using Kotlin and Jetpack Compose. It aims to provide an intuitive and seamless user experience with a robust underlying architecture.
 
 ## Tech Stack
 
@@ -32,8 +32,8 @@ The application leverages the latest Android development tools and libraries:
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/HereLiesAz/CaughtUp.git
-    cd CaughtUp
+    git clone https://github.com/HereLiesAz/CleanUnderwear.git
+    cd CleanUnderwear
     ```
 2.  Open the project in Android Studio. Let Gradle sync and resolve dependencies.
 3.  To build the debug APK from the command line, run:

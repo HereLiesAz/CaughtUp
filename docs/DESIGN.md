@@ -1,6 +1,6 @@
 # Design Guide
 
-CaughtUp is designed with a focus on simplicity, consistency, and a modern aesthetic, adhering strongly to Google's Material Design 3 guidelines.
+CleanUnderwear is designed with a focus on simplicity, consistency, and a modern aesthetic, adhering strongly to Google's Material Design 3 guidelines.
 
 ## UI Framework: Jetpack Compose
 
@@ -19,7 +19,7 @@ The application utilizes the `androidx.compose.material3` library.
 Our theming is centralized in the `Theme.kt` file (typically found under `ui/theme`).
 
 1.  **Color Palette**: We define light and dark color schemes using `lightColorScheme()` and `darkColorScheme()`. We aim to support dynamic color on Android 12+ devices, allowing the app's colors to adapt to the user's wallpaper.
-2.  **Typography**: We establish a consistent typographical hierarchy (Headings, Body, Labels) using `Typography()`. We utilize standard Material 3 text styles, customized where necessary to fit the CaughtUp brand identity.
+2.  **Typography**: We establish a consistent typographical hierarchy (Headings, Body, Labels) using `Typography()`. We utilize standard Material 3 text styles, customized where necessary to fit the CleanUnderwear brand identity.
 3.  **Shapes**: We define the corner radii for different component sizes (Small, Medium, Large) using `Shapes()`, ensuring consistent rounding across buttons, cards, and dialogs.
 
 ### Core Components

@@ -1,6 +1,6 @@
 # Architecture Guide
 
-CaughtUp follows modern Android development principles, utilizing a Clean Architecture approach combined with the Model-View-ViewModel (MVVM) presentation pattern. This ensures that the codebase remains scalable, testable, and maintainable.
+CleanUnderwear follows modern Android development principles, utilizing a Clean Architecture approach combined with the Model-View-ViewModel (MVVM) presentation pattern. This ensures that the codebase remains scalable, testable, and maintainable.
 
 ## Core Principles
 

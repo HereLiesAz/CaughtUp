@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.compose)
+    alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
 
@@ -32,11 +33,11 @@ val verPatch = versionProps.getProperty("versionPatch", "0")
 val currentVersionName = "$verMajor.$verMinor.$verPatch"
 
 android {
-    namespace = "com.hereliesaz.caughtup"
+    namespace = "com.hereliesaz.cleanunderwear"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.hereliesaz.caughtup"
+        applicationId = "com.hereliesaz.cleanunderwear"
         minSdk = 26
         targetSdk = 37
         versionCode = currentVersionCode
@@ -79,7 +80,7 @@ androidComponents {
         variant.outputs.forEach { output ->
             val version = variant.outputs.first().versionName.get()
             val code = variant.outputs.first().versionCode.get()
-            val apkName = "CaughtUp-${variant.name}-$version.$code.apk"
+            val apkName = "CleanUnderwear-${variant.name}-$version.$code.apk"
             (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
         }
     }
@@ -90,6 +91,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation(libs.mockk)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -117,4 +119,21 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.5")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+
+    // Image Loading
+    implementation(libs.coil.compose)
+
+    // On-Device AI
+    implementation(libs.litert)
 }
