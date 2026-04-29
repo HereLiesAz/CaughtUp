@@ -51,6 +51,15 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // Load secrets from local.properties
+        val localProperties = Properties()
+        val localPropertiesFile = project.rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(localPropertiesFile.inputStream())
+        }
+        val ghToken = localProperties.getProperty("GH_TOKEN", "")
+        buildConfigField("String", "GH_TOKEN", "\"$ghToken\"")
     }
 
     buildTypes {
@@ -69,6 +78,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {

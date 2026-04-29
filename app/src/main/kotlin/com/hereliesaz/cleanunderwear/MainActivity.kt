@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showPermissionRationale(onConfirm: () -> Unit) {
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this)
             .setTitle("Privacy & Monitoring Access")
             .setMessage("To build your personal registry, we need access to your contacts. To alert you of status changes, we need notification access. All data remains private on your device.")
             .setPositiveButton("Grant Access") { _, _ -> onConfirm() }

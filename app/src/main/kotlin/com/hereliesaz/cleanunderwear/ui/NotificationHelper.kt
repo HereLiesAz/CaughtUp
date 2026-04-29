@@ -11,11 +11,12 @@ import com.hereliesaz.cleanunderwear.MainActivity
 import com.hereliesaz.cleanunderwear.R
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class NotificationHelper @Inject constructor(private val context: Context) {
+class NotificationHelper @Inject constructor(@ApplicationContext private val context: Context) {
 
     companion object {
         private const val CHANNEL_ID = "panopticon_alerts"

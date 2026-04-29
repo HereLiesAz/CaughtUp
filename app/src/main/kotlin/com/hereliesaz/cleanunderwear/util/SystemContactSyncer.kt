@@ -7,12 +7,13 @@ import android.provider.ContactsContract
 import android.util.Log
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.ArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SystemContactSyncer @Inject constructor(private val context: Context) {
+class SystemContactSyncer @Inject constructor(@ApplicationContext private val context: Context) {
 
     /**
      * Updates the system contact with the latest status and verification details.
