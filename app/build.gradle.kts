@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 // Load version properties
@@ -57,8 +58,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -84,18 +85,9 @@ androidComponents {
     }
 }
 
-androidComponents {
-    onVariants { variant ->
-        variant.outputs.forEach { output ->
-            val version = variant.outputs.first().versionName.get()
-            val code = variant.outputs.first().versionCode.get()
-            val apkName = "CaughtUp-${variant.name}-$version.$code.apk"
-            (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
-        }
-    }
-}
-
 dependencies {
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
@@ -107,6 +99,22 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // Room
+    val roomVersion = "2.6.0"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // WorkManager
+    val workVersion = "2.9.0"
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
+
+    // Jsoup
+    implementation("org.jsoup:jsoup:1.17.2")
+
+    // Icons
+    implementation("androidx.compose.material:material-icons-extended:1.6.5")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

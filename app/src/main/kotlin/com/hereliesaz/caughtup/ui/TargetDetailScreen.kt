@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.caughtup.data.Target
 import java.text.SimpleDateFormat
 import java.util.Date
-import androidx.compose.ui.text.intl.Locale as ComposeLocale
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +48,7 @@ fun TargetDetailScreen(target: Target, onNavigateBack: () -> Unit) {
             )
             
             val dateString = if (target.lastScrapedTimestamp > 0) {
-                SimpleDateFormat("MM/dd/yyyy hh:mm a", ComposeLocale.current.platformLocale)
+                SimpleDateFormat("MM/dd/yyyy hh:mm a", Locale.getDefault())
                     .format(Date(target.lastScrapedTimestamp))
             } else {
                 "Never"
