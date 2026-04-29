@@ -16,9 +16,20 @@ import com.hereliesaz.cleanunderwear.data.Target
 @Composable
 fun CleanUnderwearApp(viewModel: MainViewModel) {
     val navController = rememberNavController()
+    val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        NavHost(navController = navController, startDestination = "targetList") {
+        val startDestination = if (isOnboardingCompleted) "targetList" else "onboarding"
+        
+        NavHost(navController = navController, startDestination = startDestination) {
+            composable("onboarding") {
+                OnboardingScreen(onComplete = {
+                    viewModel.completeOnboarding()
+                    navController.navigate("targetList") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                })
+            }
             composable("targetList") {
                 TargetListScreen(
                     viewModel = viewModel,

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -28,8 +29,9 @@ fun TargetListScreen(
     val targets by viewModel.targets.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showIgnored by viewModel.showIgnored.collectAsState()
-    var showSortMenu by remember { mutableStateOf(false) }
-    var selectedTargetForActions by remember { mutableStateOf<Target?>(null) }
+    var showSortMenu by rememberSaveable { mutableStateOf(false) }
+    var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedTargetForActions = targets.find { it.id == selectedTargetIdForActions }
     val sheetState = rememberModalBottomSheetState()
 
     Scaffold(
@@ -125,7 +127,7 @@ fun TargetListScreen(
                         TargetItem(
                             target = target, 
                             onClick = { onTargetClick(target.id) },
-                            onLongClick = { selectedTargetForActions = target }
+                            onLongClick = { selectedTargetIdForActions = target.id }
                         )
                     }
                 }
@@ -135,14 +137,13 @@ fun TargetListScreen(
 
     if (selectedTargetForActions != null) {
         ModalBottomSheet(
-            onDismissRequest = { selectedTargetForActions = null },
+            onDismissRequest = { selectedTargetIdForActions = null },
             sheetState = sheetState
         ) {
             TargetActionMenu(
-                target = selectedTargetForActions!!,
+                target = selectedTargetForActions,
                 onAction = { action ->
-                    // Handle actions (e.g., navigate to detail for "sites" or "frequency")
-                    selectedTargetForActions = null
+                    selectedTargetIdForActions = null
                 },
                 viewModel = viewModel
             )

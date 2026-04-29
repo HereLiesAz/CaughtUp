@@ -28,7 +28,8 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
         val selection = "${ContactsContract.Data.MIMETYPE} IN (?, ?)"
         val selectionArgs = arrayOf(
             ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE
+            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE
         )
 
         val cursor: Cursor? = contentResolver.query(
@@ -90,6 +91,10 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
                             contactData.residenceInfo = locationParts.joinToString(", ")
                         }
                     }
+                    ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE -> {
+                        val note = it.getString(data1Index) ?: ""
+                        parseNoteMetadata(note, contactData)
+                    }
                 }
             }
         }
@@ -114,18 +119,53 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
                 phoneNumber = number,
                 areaCode = areaCode,
                 sourceAccount = sourceAccounts,
-                residenceInfo = data.residenceInfo
+                residenceInfo = data.residenceInfo,
+                status = data.status,
+                lockupUrl = data.lockupUrl,
+                obituaryUrl = data.obituaryUrl,
+                lastScrapedTimestamp = data.lastCheckTimestamp
             )
         }
 
         targets.distinctBy { it.phoneNumber }
     }
 
+    private fun parseNoteMetadata(note: String, data: ContactData) {
+        val statusMatch = "\\[Registry Status: (.*?)\\]".toRegex().find(note)
+        statusMatch?.let {
+            data.status = when (it.groupValues[1]) {
+                "Monitoring" -> TargetStatus.MONITORING
+                "Incarcerated" -> TargetStatus.INCARCERATED
+                "Deceased" -> TargetStatus.DECEASED
+                "Archived" -> TargetStatus.IGNORED
+                else -> TargetStatus.UNKNOWN
+            }
+        }
+
+        val lastCheckMatch = "Last Check: (.*?)(\n|$)".toRegex().find(note)
+        lastCheckMatch?.let {
+            try {
+                val date = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.US).parse(it.groupValues[1])
+                data.lastCheckTimestamp = date?.time ?: 0L
+            } catch (e: Exception) {}
+        }
+
+        val recordsMatch = "Records: (.*?)(\n|$)".toRegex().find(note)
+        recordsMatch?.let { data.lockupUrl = it.groupValues[1].trim() }
+
+        val obitMatch = "Obit: (.*?)(\n|$)".toRegex().find(note)
+        obitMatch?.let { data.obituaryUrl = it.groupValues[1].trim() }
+    }
+
     private class ContactData(
         val displayName: String,
         var phoneNumber: String? = null,
         var residenceInfo: String? = null,
-        val accounts: MutableSet<String> = mutableSetOf()
+        val accounts: MutableSet<String> = mutableSetOf(),
+        var status: TargetStatus = TargetStatus.UNKNOWN,
+        var lastCheckTimestamp: Long = 0L,
+        var lockupUrl: String? = null,
+        var obituaryUrl: String? = null
     )
 }
 

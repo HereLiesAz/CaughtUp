@@ -1,6 +1,7 @@
 package com.hereliesaz.cleanunderwear.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -47,6 +48,10 @@ class MainViewModel @Inject constructor(
 
     private val _showIgnored = kotlinx.coroutines.flow.MutableStateFlow(false)
     val showIgnored: StateFlow<Boolean> = _showIgnored
+
+    private val prefs = application.getSharedPreferences("clean_underwear_prefs", Context.MODE_PRIVATE)
+    private val _isOnboardingCompleted = kotlinx.coroutines.flow.MutableStateFlow(prefs.getBoolean("onboarding_done", false))
+    val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted
 
     val targets: StateFlow<List<Target>> = kotlinx.coroutines.flow.combine(
         _targets, _searchQuery, _sortOrder, _showIgnored
@@ -114,6 +119,11 @@ class MainViewModel @Inject constructor(
     
     fun setSortOrder(order: SortOrder) {
         _sortOrder.value = order
+    }
+
+    fun completeOnboarding() {
+        prefs.edit().putBoolean("onboarding_done", true).apply()
+        _isOnboardingCompleted.value = true
     }
 
     fun sweepContacts() {

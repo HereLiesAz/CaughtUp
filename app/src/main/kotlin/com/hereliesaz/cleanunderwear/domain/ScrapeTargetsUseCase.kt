@@ -22,7 +22,8 @@ class ScrapeTargetsUseCase @Inject constructor(
     private val stealthScraper: WebViewScraper,
     private val researchAgent: OnDeviceResearchAgent,
     private val verifier: IdentityVerifier,
-    private val notifications: NotificationHelper
+    private val notifications: NotificationHelper,
+    private val contactSyncer: SystemContactSyncer
 ) {
     private val semaphore = Semaphore(3) // Only 3 concurrent "interrogations" to avoid detection
 
@@ -85,17 +86,19 @@ class ScrapeTargetsUseCase @Inject constructor(
             }
 
             // 4. Update the ledger
-            repository.updateTarget(
-                target.copy(
-                    status = newStatus,
-                    lastScrapedTimestamp = now,
-                    lockupUrl = discoveredLockupUrl,
-                    obituaryUrl = discoveredObitUrl,
-                    nextScheduledCheck = now + (target.checkFrequencyHours * 3600000L),
-                    lastStatusChangeTimestamp = statusChangeTimestamp,
-                    lastVerificationSnippet = verificationSnippet
-                )
+            val updatedTarget = target.copy(
+                status = newStatus,
+                lastScrapedTimestamp = now,
+                lockupUrl = discoveredLockupUrl,
+                obituaryUrl = discoveredObitUrl,
+                nextScheduledCheck = now + (target.checkFrequencyHours * 3600000L),
+                lastStatusChangeTimestamp = statusChangeTimestamp,
+                lastVerificationSnippet = verificationSnippet
             )
+            repository.updateTarget(updatedTarget)
+            
+            // 5. Sync back to system contacts
+            contactSyncer.syncToSystem(updatedTarget)
         } catch (e: Exception) {
             android.util.Log.e("ScrapeUseCase", "The void refused to yield data for ${target.displayName}", e)
         }

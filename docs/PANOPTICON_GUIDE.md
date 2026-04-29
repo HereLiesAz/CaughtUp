@@ -1,0 +1,63 @@
+# Technical Guide: The Panopticon Engine
+
+This document details the internal logic of the CleanUnderwear autonomous monitoring pipeline.
+
+## 1. The Scraping Pipeline
+
+The app uses a tiered scraping strategy to balance speed and stealth:
+
+### `HtmlScraper` (Tier 1)
+- **Method**: Standard OkHttp + Jsoup.
+- **Target**: Static municipal rosters and simple arrest logs.
+- **Stealth**: Disguises the `User-Agent` as a desktop browser.
+- **Use Case**: High-speed, low-overhead scans of primitive government sites.
+
+### `WebViewScraper` (Tier 2)
+- **Method**: Headless `WebView` with JavaScript injection.
+- **Target**: Sites protected by Cloudflare, Turnstile, or dynamic JS rendering (most funeral homes).
+- **Stealth**: Waits for 5 seconds after `onPageFinished` to allow JS challenges to resolve before extracting the DOM via a JavaScript Interface (`HTMLOUT`).
+- **Timeout**: Enforces a 30-second hard timeout to prevent background hangs.
+
+---
+
+## 2. Identity Verification & Evidence
+
+Because human names are ambiguous, the `IdentityVerifier` performs the following checks before declaring a match:
+
+1. **Variations**: Checks for "First Last", "Last, First", and "First Middle Last".
+2. **Nicknames**: Uses the `OnDeviceResearchAgent` to expand first names (e.g., "Bob" -> "Robert").
+3. **Evidence Snippet**: Extracts ~200 characters of text surrounding the match. This is stored as `lastVerificationSnippet` and presented to the user for confirmation.
+
+---
+
+## 3. Background Scheduling
+
+The system uses `WorkManager` for guaranteed execution:
+
+- **PeriodicWorkRequest**: Fixed 24-hour interval.
+- **Daily 9 AM Trigger**: The initial delay is calculated dynamically to align with the next 9:00 AM window.
+- **Semaphore Concurrency**: The `ScrapeTargetsUseCase` uses a `Semaphore(3)` to limit concurrent network requests, preventing the app from being flagged as a bot by municipal firewalls.
+
+---
+
+## 4. Decentralized State Recovery
+
+CleanUnderwear treats the Android `Contacts` database as a persistent data store:
+
+- **Injection**: Every registry update is written to the system contact's `Note` field in a structured format:
+  ```
+  [Registry Status: Incarcerated]
+  Last Check: 04/29/2026
+  Records: https://...
+  ```
+- **Recovery**: During the `harvestContacts` phase, the `ContactHarvester` regex-parses these notes. This allows the app to restore its entire monitoring state without a cloud backup or login.
+
+---
+
+## 5. Crash Reporting
+
+The `GitHubCrashReporter` is an UncaughtExceptionHandler that triggers during fatal errors:
+1. Captures the `Throwable` stack trace.
+2. Formats a JSON payload with device details.
+3. Posts it to the GitHub `Issues` API using an OkHttp background request.
+4. Allows the default handler to take over (triggering the standard Android ANR/Crash dialog).
