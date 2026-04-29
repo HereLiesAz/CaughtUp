@@ -20,7 +20,7 @@ class JurisdictionMapper {
     fun getLockupUrl(areaCode: String, residenceInfo: String? = null): String? {
         val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-        if (isLouisiana(residenceInfo)) {
+        if (isLouisiana(lowerResidence)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://opso.us/docket/"
              }
