@@ -43,7 +43,7 @@ class JurisdictionMapper {
     fun getObituaryUrl(areaCode: String, residenceInfo: String? = null): String? {
          val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-         if (isLouisiana(residenceInfo)) {
+         if (isLouisiana(lowerResidence)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://obits.nola.com/us/obituaries/nola/browse"
              }
