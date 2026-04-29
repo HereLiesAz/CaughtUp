@@ -55,44 +55,45 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        private fun setupCrashReporting() {
-            val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-                // In production, you'd use a background service or WorkManager for this.
-                // For now, we attempt a quick fire-and-forget.
-                GitHubCrashReporter(this).reportCrash(throwable)
-                defaultHandler?.uncaughtException(thread, throwable)
-            }
+    }
+
+    private fun setupCrashReporting() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            // In production, you'd use a background service or WorkManager for this.
+            // For now, we attempt a quick fire-and-forget.
+            GitHubCrashReporter(this).reportCrash(throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.WRITE_CONTACTS
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        private fun checkAndRequestPermissions() {
-            val permissions = mutableListOf(
-                Manifest.permission.READ_CONTACTS,
-                Manifest.permission.WRITE_CONTACTS
-            )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-
-            val missingPermissions = permissions.filter {
-                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-            }
-
-            if (missingPermissions.isNotEmpty()) {
-                showPermissionRationale {
-                    requestPermissionsLauncher.launch(missingPermissions.toTypedArray())
-                }
-            }
+        val missingPermissions = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 
-        private fun showPermissionRationale(onConfirm: () -> Unit) {
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Privacy & Monitoring Access")
-                .setMessage("To build your personal registry, we need access to your contacts. To alert you of status changes, we need notification access. All data remains private on your device.")
-                .setPositiveButton("Grant Access") { _, _ -> onConfirm() }
-                .setNegativeButton("Exit") { _, _ -> finish() }
-                .setCancelable(false)
-                .show()
+        if (missingPermissions.isNotEmpty()) {
+            showPermissionRationale {
+                requestPermissionsLauncher.launch(missingPermissions.toTypedArray())
+            }
         }
+    }
+
+    private fun showPermissionRationale(onConfirm: () -> Unit) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Privacy & Monitoring Access")
+            .setMessage("To build your personal registry, we need access to your contacts. To alert you of status changes, we need notification access. All data remains private on your device.")
+            .setPositiveButton("Grant Access") { _, _ -> onConfirm() }
+            .setNegativeButton("Exit") { _, _ -> finish() }
+            .setCancelable(false)
+            .show()
     }
 }
