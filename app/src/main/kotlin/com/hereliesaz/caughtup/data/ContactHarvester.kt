@@ -31,11 +31,17 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
             ContactsContract.RawContacts.ACCOUNT_TYPE
         )
 
+        val selection = "${ContactsContract.Data.MIMETYPE} IN (?, ?)"
+        val selectionArgs = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE
+        )
+
         val cursor: Cursor? = contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             null
         )
 
