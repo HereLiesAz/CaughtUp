@@ -17,9 +17,25 @@ interface TargetRepository {
 class OfflineTargetRepository(private val targetDao: TargetDao) : TargetRepository {
     override fun getAllTargets(): Flow<List<Target>> = targetDao.getAllTargets()
     override fun getTargetsByStatus(status: TargetStatus): Flow<List<Target>> = targetDao.getTargetsByStatus(status)
-    override suspend fun insertTarget(target: Target) = targetDao.insertTarget(target)
-    override suspend fun insertTargets(targets: List<Target>) = targetDao.insertTargets(targets)
-    override suspend fun updateTarget(target: Target) = targetDao.updateTarget(target)
-    override suspend fun wipeSlateClean() = targetDao.wipeSlateClean()
+    override suspend fun insertTarget(target: Target) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            targetDao.insertTarget(target)
+        }
+    }
+    override suspend fun insertTargets(targets: List<Target>) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            targetDao.insertTargets(targets)
+        }
+    }
+    override suspend fun updateTarget(target: Target) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            targetDao.updateTarget(target)
+        }
+    }
+    override suspend fun wipeSlateClean() {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            targetDao.wipeSlateClean()
+        }
+    }
 }
 
