@@ -6,10 +6,21 @@ package com.hereliesaz.caughtup.network
  */
 class JurisdictionMapper {
 
+    companion object {
+        private val LA_REGEX = Regex("\\bla\\b")
+    }
+
+    private fun isLouisiana(residenceInfo: String?): Boolean {
+        val lowerResidence = residenceInfo?.lowercase() ?: ""
+        return lowerResidence.contains("new orleans") ||
+               LA_REGEX.containsMatchIn(lowerResidence) ||
+               lowerResidence.contains("louisiana")
+    }
+
     fun getLockupUrl(areaCode: String, residenceInfo: String? = null): String? {
         val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-        if (lowerResidence.contains("new orleans") || Regex("\\bla\\b").containsMatchIn(lowerResidence) || lowerResidence.contains("louisiana")) {
+        if (isLouisiana(residenceInfo)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://opso.us/docket/"
              }
@@ -32,7 +43,7 @@ class JurisdictionMapper {
     fun getObituaryUrl(areaCode: String, residenceInfo: String? = null): String? {
          val lowerResidence = residenceInfo?.lowercase() ?: ""
 
-         if (lowerResidence.contains("new orleans") || Regex("\\bla\\b").containsMatchIn(lowerResidence) || lowerResidence.contains("louisiana")) {
+         if (isLouisiana(residenceInfo)) {
              if (areaCode == "504" || lowerResidence.contains("new orleans")) {
                  return "https://obits.nola.com/us/obituaries/nola/browse"
              }

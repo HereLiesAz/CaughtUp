@@ -18,24 +18,24 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
             ContactsContract.Data.CONTACT_ID,
             ContactsContract.Data.MIMETYPE,
             ContactsContract.Data.DATA1, // Often the main data (number, email, street)
-            ContactsContract.Data.DATA2, // Often type
-            ContactsContract.Data.DATA3, // Often label
-            ContactsContract.Data.DATA4,
-            ContactsContract.Data.DATA5,
-            ContactsContract.Data.DATA6,
             ContactsContract.Data.DATA7,
             ContactsContract.Data.DATA8,
             ContactsContract.Data.DATA9,
-            ContactsContract.Data.DATA10,
             ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
             ContactsContract.RawContacts.ACCOUNT_TYPE
+        )
+
+        val selection = "${ContactsContract.Data.MIMETYPE} IN (?, ?)"
+        val selectionArgs = arrayOf(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+            ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_ITEM_TYPE
         )
 
         val cursor: Cursor? = contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             null
         )
 
@@ -55,7 +55,7 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
 
                 val mimeType = it.getString(mimeTypeIndex)
                 val displayName = it.getString(nameIndex) ?: continue
-                val accountType = it.getString(accountTypeIndex)
+                val accountType = if (accountTypeIndex >= 0) it.getString(accountTypeIndex) else null
 
                 val contactData = contactDataMap.getOrPut(contactId) { ContactData(displayName) }
 
