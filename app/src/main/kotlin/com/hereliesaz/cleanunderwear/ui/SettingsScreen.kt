@@ -148,7 +148,8 @@ fun SettingsScreen(
                     }
                     context.startActivity(intent)
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
             )
 
             HorizontalDivider()
@@ -173,7 +174,8 @@ fun SettingsScreen(
                     }
                     context.startActivity(intent)
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
             )
             
             AzButton(

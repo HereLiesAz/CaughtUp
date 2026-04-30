@@ -430,7 +430,8 @@ fun ManualEntryDialog(
                     text = "Ingest Target",
                     onClick = { onConfirm(name, phone.takeIf { it.isNotBlank() }, email.takeIf { it.isNotBlank() }) },
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    enabled = name.isNotBlank() && (phone.isNotBlank() || email.isNotBlank())
+                    enabled = name.isNotBlank() && (phone.isNotBlank() || email.isNotBlank()),
+                    shape = AzButtonShape.RECTANGLE
                 )
             }
         },

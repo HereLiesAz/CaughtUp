@@ -24,8 +24,13 @@ val SurveillanceDarkColorScheme = darkColorScheme(
     onBackground = Color.White,
     onSurface = Color.White,
     error = WarningRed,
+    primaryContainer = DeepSlate,
+    onPrimaryContainer = NeonCyan,
     secondaryContainer = CircuitBlue.copy(alpha = 0.3f),
-    onSecondaryContainer = Color.White
+    onSecondaryContainer = Color.White,
+    surfaceVariant = SurveillanceGrey,
+    onSurfaceVariant = Color.LightGray,
+    outline = CircuitBlue
 )
 
 val SurveillanceLightColorScheme = lightColorScheme(
@@ -39,5 +44,12 @@ val SurveillanceLightColorScheme = lightColorScheme(
     onTertiary = Color.Black,
     onBackground = DeepSlate,
     onSurface = DeepSlate,
-    error = Color(0xFFD32F2F)
+    error = Color(0xFFD32F2F),
+    primaryContainer = Color(0xFFF0F2F5),
+    onPrimaryContainer = CircuitBlue,
+    secondaryContainer = NeonCyan.copy(alpha = 0.1f),
+    onSecondaryContainer = CircuitBlue,
+    surfaceVariant = Color(0xFFE1E4E8),
+    onSurfaceVariant = DeepSlate,
+    outline = CircuitBlue
 )

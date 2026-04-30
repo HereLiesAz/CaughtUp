@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.util.CyberBackgroundChecks
@@ -97,14 +98,16 @@ fun TargetDetailScreen(
                     AzButton(
                         text = "Public Records / Roster",
                         onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = AzButtonShape.RECTANGLE
                     )
                 }
                 target.obituaryUrl?.let { url ->
                     AzButton(
                         text = "Obituary Registry",
                         onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = AzButtonShape.RECTANGLE
                     )
                 }
             }
@@ -163,14 +166,16 @@ fun TargetDetailScreen(
                                         lastVerificationSnippet = null
                                     ))
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                shape = AzButtonShape.RECTANGLE
                             )
                             AzButton(
                                 text = "Confirm Match",
                                 onClick = { 
                                     // Confirmed
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                shape = AzButtonShape.RECTANGLE
                             )
                         }
                     }
@@ -231,7 +236,8 @@ fun TargetDetailScreen(
                         // Ignore if no web browser is installed
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
             )
         }
     }

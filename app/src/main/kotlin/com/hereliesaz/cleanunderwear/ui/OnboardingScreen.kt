@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -48,7 +49,8 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                     } else {
                         onComplete()
                     }
-                }
+                },
+                shape = AzButtonShape.RECTANGLE
             )
         }
     }
