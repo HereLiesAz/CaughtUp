@@ -52,6 +52,10 @@ android {
             useSupportLibrary = true
         }
 
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
+
         // Load secrets from local.properties
         val localProperties = Properties()
         val localPropertiesFile = project.rootProject.file("local.properties")
@@ -149,7 +153,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     // On-Device AI
-    implementation(libs.tflite)
+    implementation(libs.litert)
     implementation(libs.litert.tensorflow.ops)
 
     // Thumb-Driven Navigation

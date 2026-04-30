@@ -33,7 +33,6 @@ class OnDeviceResearchAgent @Inject constructor(
             val modelBuffer = loadModelFile("research_agent.tflite")
             
             // Fix: Explicitly add FlexDelegate to support complex ops like FlexStringLower
-            // We use the traditional TFLite namespace as it is currently bundled with the Flex delegate.
             val options = Interpreter.Options().apply {
                 addDelegate(FlexDelegate())
             }
