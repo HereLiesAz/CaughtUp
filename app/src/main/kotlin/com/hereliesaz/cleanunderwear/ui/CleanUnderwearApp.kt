@@ -42,11 +42,11 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         currentDestination = currentDestination?.route,
         isLandscape = isLandscape,
-        initiallyExpanded = false
-    ) {
+        initiallyExpanded = false,
+        ) {
         azConfig(
             dockingSide = AzDockingSide.LEFT,
-            packButtons = true
+            packButtons = true,
         )
         
         azTheme(
