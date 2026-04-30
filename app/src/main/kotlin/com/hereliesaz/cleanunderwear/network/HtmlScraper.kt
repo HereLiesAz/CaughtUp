@@ -19,8 +19,12 @@ class HtmlScraper @Inject constructor(
 
     suspend fun scrapeMugshots(url: String, targetName: String): IdentityVerifier.VerificationResult = withContext(Dispatchers.IO) {
         try {
+            val sanitizedUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                "https://$url"
+            } else url
+
             val request = Request.Builder()
-                .url(url)
+                .url(sanitizedUrl)
                 // Disguising our automated dragnet as a bored human on a desktop.
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build()

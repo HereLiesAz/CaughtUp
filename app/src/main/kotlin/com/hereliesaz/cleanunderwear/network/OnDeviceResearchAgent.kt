@@ -213,8 +213,12 @@ class OnDeviceResearchAgent @Inject constructor(
             val cleanLink = if (link.startsWith("//duckduckgo.com/l/?uddg=")) {
                 java.net.URLDecoder.decode(link.substringAfter("uddg=").substringBefore("&"), "UTF-8")
             } else link
+            
+            val sanitizedLink = if (!cleanLink.startsWith("http://") && !cleanLink.startsWith("https://")) {
+                "https://$cleanLink"
+            } else cleanLink
 
-            candidates.add(cleanLink to "$title $snippet")
+            candidates.add(sanitizedLink to "$title $snippet")
         }
 
         if (candidates.isEmpty()) return fallbackUrl

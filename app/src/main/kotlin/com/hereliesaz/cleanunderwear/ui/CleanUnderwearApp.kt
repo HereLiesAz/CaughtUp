@@ -51,7 +51,8 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         
         azTheme(
             activeColor = activeColor,
-            translucentBackground = backgroundColor.copy(alpha = 0.90f)
+            translucentBackground = backgroundColor.copy(alpha = 0.90f),
+            defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
         )
 
         azAdvanced(
@@ -63,6 +64,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 "harvest" to "Deep scythe across all connected social and system databases.",
                 "interrogate" to "Force a real-time check against public rosters."
             )
+
         )
 
         if (isOnboardingCompleted) {
@@ -74,29 +76,31 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 info = "View the complete surveillance list."
             )
 
-            azNestedRail(
+            azRailHostItem(
                 id = "intelligence_ops",
                 text = "Ops",
                 content = Icons.Default.Analytics,
-                alignment = AzNestedRailAlignment.VERTICAL
             ) {
-                azRailItem(
+                azRailSubItem(
                     id = "ingest",
                     text = "Ingest",
                     content = Icons.Default.PersonAdd,
-                    onClick = { viewModel.setShowManualEntryDialog(true) }
+                    onClick = { viewModel.setShowManualEntryDialog(true) },
+                    hostId = "intelligence_ops"
                 )
-                azRailItem(
+                azRailSubItem(
                     id = "harvest",
                     text = "Harvest",
                     content = Icons.Default.Radar,
-                    onClick = { viewModel.sweepContacts() }
+                    onClick = { viewModel.sweepContacts() },
+                    hostId = "intelligence_ops"
                 )
-                azRailItem(
+                azRailSubItem(
                     id = "interrogate",
                     text = "Interrogate",
                     content = Icons.Default.SavedSearch,
-                    onClick = { viewModel.triggerManualInterrogation() }
+                    onClick = { viewModel.triggerManualInterrogation() },
+                    hostId = "intelligence_ops"
                 )
             }
 
