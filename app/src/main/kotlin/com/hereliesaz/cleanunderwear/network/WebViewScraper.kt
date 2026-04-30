@@ -28,6 +28,64 @@ import kotlin.coroutines.resume
 @Singleton
 class WebViewScraper @Inject constructor(@ApplicationContext private val context: Context) {
 
+    private var htmlCallback: ((String) -> Unit)? = null
+
+    inner class AndroidInterface {
+        @JavascriptInterface
+        fun processHtml(html: String) {
+            htmlCallback?.invoke(html)
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    suspend fun scrapeWithInjection(url: String, script: String): String? = withContext(Dispatchers.Main) {
+        DiagnosticLogger.log("Launching Deep Harvest: $url")
+        withTimeoutOrNull(120000L) { // 2 minute timeout for scrolling/loading
+            suspendCancellableCoroutine { continuation ->
+                val webView = WebView(context)
+                var isResumed = false
+
+                fun resumeOnce(html: String?) {
+                    if (!isResumed) {
+                        isResumed = true
+                        htmlCallback = null
+                        continuation.resume(html)
+                        webView.post { 
+                            try {
+                                webView.stopLoading()
+                                webView.destroy() 
+                            } catch (e: Exception) {}
+                        }
+                    }
+                }
+
+                continuation.invokeOnCancellation { resumeOnce(null) }
+
+                webView.settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36"
+                }
+
+                webView.addJavascriptInterface(AndroidInterface(), "AndroidInterface")
+
+                webView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        DiagnosticLogger.log("Deep Harvest page ready. Injecting intelligence script...")
+                        view?.evaluateJavascript(script, null)
+                    }
+                }
+
+                htmlCallback = { html ->
+                    DiagnosticLogger.log("Intelligence data extracted via script.")
+                    resumeOnce(html)
+                }
+
+                webView.loadUrl(url)
+            }
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     suspend fun scrapeGhostTown(url: String): Document? = withContext(Dispatchers.Main) {
         DiagnosticLogger.log("Opening Covert Browser for: $url")

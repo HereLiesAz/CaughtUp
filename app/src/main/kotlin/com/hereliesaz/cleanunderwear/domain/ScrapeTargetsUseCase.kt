@@ -61,39 +61,47 @@ class ScrapeTargetsUseCase @Inject constructor(
 
     private suspend fun processTarget(target: Target, now: Long) {
         try {
+            var activeTarget = target
+
+            // 0. Intelligence Enrichment (Field Population)
+            // If the target is nameless or missing residence info, attempt to resolve via public records
+            if (target.displayName == "Unnamed Entity" || target.residenceInfo.isNullOrBlank()) {
+                activeTarget = researchAgent.enrichIntelligence(target)
+            }
+
             var newStatus = TargetStatus.MONITORING
-            var discoveredLockupUrl = target.lockupUrl
-            var discoveredObitUrl = target.obituaryUrl
-            var verificationSnippet = target.lastVerificationSnippet
+            var discoveredLockupUrl = activeTarget.lockupUrl
+            var discoveredObitUrl = activeTarget.obituaryUrl
+            var verificationSnippet = activeTarget.lastVerificationSnippet
 
             // 1. Interrogate the municipal cages
-            val lockupUrl = target.lockupUrl ?: researchAgent.getDynamicLockupUrl(target.areaCode, target.residenceInfo).also {
+            val lockupUrl = activeTarget.lockupUrl ?: researchAgent.getDynamicLockupUrl(activeTarget.areaCode, activeTarget.residenceInfo).also {
                 discoveredLockupUrl = it
             }
             
-            DiagnosticLogger.log("Checking jail roster for ${target.displayName} at $lockupUrl")
+            DiagnosticLogger.log("Checking jail roster for ${activeTarget.displayName} at $lockupUrl")
             
             // Note: Updated HtmlScraper to return result
-            val lockupResult = basicScraper.scrapeMugshots(lockupUrl, target.displayName)
+            val lockupResult = basicScraper.scrapeMugshots(lockupUrl, activeTarget.displayName)
             if (lockupResult.isMatch) {
-                DiagnosticLogger.log("MATCH FOUND: ${target.displayName} located in local jail.", DiagnosticLogger.LogEntry.LogLevel.WARN)
+                DiagnosticLogger.log("MATCH FOUND: ${activeTarget.displayName} located in local jail.", DiagnosticLogger.LogEntry.LogLevel.WARN)
                 newStatus = TargetStatus.INCARCERATED
                 verificationSnippet = lockupResult.snippet
             }
 
             // 2. If they aren't in a cell, check if they are in the ground
             if (newStatus == TargetStatus.MONITORING) {
-                val obitUrl = target.obituaryUrl ?: researchAgent.getDynamicObituaryUrl(target.areaCode, target.residenceInfo).also {
+                val obitUrl = activeTarget.obituaryUrl ?: researchAgent.getDynamicObituaryUrl(activeTarget.areaCode, activeTarget.residenceInfo).also {
                     discoveredObitUrl = it
                 }
                 
-                DiagnosticLogger.log("Checking obituary registry for ${target.displayName} at $obitUrl")
+                DiagnosticLogger.log("Checking obituary registry for ${activeTarget.displayName} at $obitUrl")
                 
                 val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
                 if (obitDoc != null) {
-                    val result = verifier.verifyIdentity(obitDoc.text(), target.displayName)
+                    val result = verifier.verifyIdentity(obitDoc.text(), activeTarget.displayName)
                     if (result.isMatch) {
-                        DiagnosticLogger.log("DEATH DETECTED: ${target.displayName} found in obituary registry.", DiagnosticLogger.LogEntry.LogLevel.WARN)
+                        DiagnosticLogger.log("DEATH DETECTED: ${activeTarget.displayName} found in obituary registry.", DiagnosticLogger.LogEntry.LogLevel.WARN)
                         newStatus = TargetStatus.DECEASED
                         verificationSnippet = result.snippet
                     }
@@ -101,19 +109,19 @@ class ScrapeTargetsUseCase @Inject constructor(
             }
 
             // 3. Detect Status Change and Notify
-            var statusChangeTimestamp = target.lastStatusChangeTimestamp
-            if (newStatus != target.status && target.status != TargetStatus.UNKNOWN) {
-                notifications.notifyStatusChange(target.copy(status = newStatus), target.status)
+            var statusChangeTimestamp = activeTarget.lastStatusChangeTimestamp
+            if (newStatus != activeTarget.status && activeTarget.status != TargetStatus.UNKNOWN) {
+                notifications.notifyStatusChange(activeTarget.copy(status = newStatus), activeTarget.status)
                 statusChangeTimestamp = now
             }
 
             // 4. Update the ledger
-            val updatedTarget = target.copy(
+            val updatedTarget = activeTarget.copy(
                 status = newStatus,
                 lastScrapedTimestamp = now,
                 lockupUrl = discoveredLockupUrl,
                 obituaryUrl = discoveredObitUrl,
-                nextScheduledCheck = now + (target.checkFrequencyHours * 3600000L),
+                nextScheduledCheck = now + (activeTarget.checkFrequencyHours * 3600000L),
                 lastStatusChangeTimestamp = statusChangeTimestamp,
                 lastVerificationSnippet = verificationSnippet
             )

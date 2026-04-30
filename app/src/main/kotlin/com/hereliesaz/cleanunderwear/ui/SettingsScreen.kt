@@ -171,6 +171,14 @@ fun SettingsScreen(
             ) {
                 Text("Connect New Account")
             }
+            
+            Button(
+                onClick = { viewModel.harvestFacebook() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Text("Interrogate Facebook Social Graph")
+            }
 
             HorizontalDivider()
         }

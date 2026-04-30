@@ -56,7 +56,7 @@ fun TargetListScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("The Registry") },
+                    title = { Text("Was their underwear clean?") },
                     actions = {
                         IconButton(onClick = { showSortMenu = true }) {
                             Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")

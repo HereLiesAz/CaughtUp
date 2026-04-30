@@ -1,6 +1,7 @@
 package com.hereliesaz.cleanunderwear.network
 
 import android.content.Context
+import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -143,6 +144,54 @@ class OnDeviceResearchAgent @Inject constructor(
             ?: "https://www.legacy.com/obituaries"
         
         return executeAiSearch(query, fallback)
+    }
+
+    /**
+     * Interrogates public records to populate missing intelligence fields.
+     */
+    suspend fun enrichIntelligence(target: Target): Target {
+        // We only enrich if we have a phone number but are missing other critical data
+        val phone = target.phoneNumber ?: return target
+        if (target.displayName != "Unnamed Entity" && !target.residenceInfo.isNullOrBlank()) return target
+
+        DiagnosticLogger.log("Deep Interrogation: Attempting to resolve identity for $phone")
+        
+        val query = "\"$phone\" \"address\" OR \"name\""
+        val searchUrl = "https://html.duckduckgo.com/html/?q=${URLEncoder.encode(query, "UTF-8")}"
+        val document = scraper.scrapeGhostTown(searchUrl) ?: return target
+
+        val snippets = document.select(".result__snippet").map { it.text() }
+        if (snippets.isEmpty()) return target
+
+        var resolvedName = target.displayName
+        var resolvedAddress = target.residenceInfo
+
+        snippets.forEach { snippet ->
+            // Use LiteRT to score snippet for high-fidelity identity data
+            val score = scoreWithModel(snippet)
+            if (score > 0.7f) {
+                // Heuristic extraction for now (Name usually appears before Address)
+                // In a future update, we can use a NER model for this.
+                if (resolvedName == "Unnamed Entity") {
+                    val potentialName = snippet.substringBefore(",").trim()
+                    if (validatePersonName(potentialName)) {
+                        resolvedName = potentialName
+                    }
+                }
+                
+                if (resolvedAddress.isNullOrBlank()) {
+                    val potentialAddress = snippet.split(",").drop(1).take(2).joinToString(",").trim()
+                    if (potentialAddress.length > 5) {
+                        resolvedAddress = potentialAddress
+                    }
+                }
+            }
+        }
+
+        return target.copy(
+            displayName = resolvedName,
+            residenceInfo = resolvedAddress
+        )
     }
 
     private suspend fun executeAiSearch(query: String, fallbackUrl: String): String {

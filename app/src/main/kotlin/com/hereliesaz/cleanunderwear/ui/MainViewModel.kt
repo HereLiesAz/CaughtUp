@@ -34,7 +34,9 @@ class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: TargetRepository,
     private val harvestContactsUseCase: HarvestContactsUseCase,
-    private val setupSourcesUseCase: SetupSourcesUseCase
+    private val setupSourcesUseCase: SetupSourcesUseCase,
+    private val fbHarvester: com.hereliesaz.cleanunderwear.data.FacebookHarvester,
+    private val researchAgent: com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
 ) : AndroidViewModel(application) {
 
     enum class SortOrder { NAME, STATUS, DATE }
@@ -283,6 +285,15 @@ class MainViewModel @Inject constructor(
                 )
             }
             
+            _operationState.value = OperationState(isRunning = false)
+        }
+    }
+
+    fun harvestFacebook() {
+        viewModelScope.launch {
+            _operationState.value = OperationState(isRunning = true, description = "Interrogating Social Graph...", progress = -1f)
+            val fbFriends = fbHarvester.harvestFriends()
+            harvestContactsUseCase.processManualTargets(fbFriends)
             _operationState.value = OperationState(isRunning = false)
         }
     }
