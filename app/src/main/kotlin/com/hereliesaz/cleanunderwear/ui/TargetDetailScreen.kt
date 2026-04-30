@@ -41,8 +41,9 @@ fun TargetDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         }
@@ -65,7 +66,7 @@ fun TargetDetailScreen(
 
             DetailRow(label = "Intelligence Name", value = target.displayName)
             
-            HorizontalDivider()
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
 
             target.phoneNumber?.let { DetailRow(label = "Contact Number", value = it) }
             target.email?.let { DetailRow(label = "Intelligence Email", value = it) }

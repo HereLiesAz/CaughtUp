@@ -42,8 +42,8 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         currentDestination = currentDestination?.route,
         isLandscape = isLandscape,
-        initiallyExpanded = false,
-        ) {
+        initiallyExpanded = false
+    ) {
         azConfig(
             dockingSide = AzDockingSide.LEFT,
             packButtons = true,
@@ -52,7 +52,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         azTheme(
             activeColor = activeColor,
             translucentBackground = backgroundColor.copy(alpha = 0.90f),
-            defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
+            defaultShape = AzButtonShape.RECTANGLE
         )
 
         azAdvanced(
@@ -76,31 +76,29 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 info = "View the complete surveillance list."
             )
 
-            azRailHostItem(
+            azNestedRail(
                 id = "intelligence_ops",
                 text = "Ops",
                 content = Icons.Default.Analytics,
+                alignment = AzNestedRailAlignment.VERTICAL
             ) {
-                azRailSubItem(
+                azRailItem(
                     id = "ingest",
                     text = "Ingest",
                     content = Icons.Default.PersonAdd,
-                    onClick = { viewModel.setShowManualEntryDialog(true) },
-                    hostId = "intelligence_ops"
+                    onClick = { viewModel.setShowManualEntryDialog(true) }
                 )
-                azRailSubItem(
+                azRailItem(
                     id = "harvest",
                     text = "Harvest",
                     content = Icons.Default.Radar,
-                    onClick = { viewModel.sweepContacts() },
-                    hostId = "intelligence_ops"
+                    onClick = { viewModel.sweepContacts() }
                 )
-                azRailSubItem(
+                azRailItem(
                     id = "interrogate",
                     text = "Interrogate",
                     content = Icons.Default.SavedSearch,
-                    onClick = { viewModel.triggerManualInterrogation() },
-                    hostId = "intelligence_ops"
+                    onClick = { viewModel.triggerManualInterrogation() }
                 )
             }
 

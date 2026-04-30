@@ -32,6 +32,7 @@ fun TargetListScreen(
     onTargetClick: (Int) -> Unit
 ) {
     val targets by viewModel.targets.collectAsState()
+    val operationState by viewModel.operationState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
     val showIgnored by viewModel.showIgnored.collectAsState()
@@ -60,6 +61,21 @@ fun TargetListScreen(
             historyContext = "registry_search",
             onSubmit = { viewModel.setSearchQuery(it) }
         )
+
+        if (operationState.isRunning) {
+            LinearProgressIndicator(
+                progress = { if (operationState.progress >= 0f) operationState.progress else 0f },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Text(
+                text = operationState.description,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -395,6 +411,9 @@ fun ManualEntryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.background,
+        titleContentColor = MaterialTheme.colorScheme.primary,
+        textContentColor = MaterialTheme.colorScheme.onBackground,
         title = { Text("Manual Intelligence Ingestion") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
