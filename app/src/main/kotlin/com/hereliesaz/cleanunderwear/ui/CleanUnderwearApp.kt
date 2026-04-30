@@ -116,8 +116,8 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
             azMenuToggle(
                 id = "diagnostic_log",
                 isChecked = showDiagnosticLog,
-                toggleOnText = "Hide Activity Log",
-                toggleOffText = "Show Activity Log",
+                toggleOnText = "Hide",
+                toggleOffText = "Log",
                 onClick = { viewModel.setShowDiagnosticLog(!showDiagnosticLog) }
             )
         }
