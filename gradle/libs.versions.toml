@@ -20,8 +20,9 @@ coil = "2.7.0"
 mockk = "1.14.9"
 hiltNav = "1.3.0"
 litert = "2.1.4"
-litert-ops = "0.1.0"
+tflite = "2.16.1"
 appcompat = "1.7.1"
+aznavrail = "8.8"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
@@ -52,11 +53,13 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor",
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
-litert-tensorflow-ops = { module = "io.github.google-ai-edge:litert-select-tf-ops", version.ref = "litert-ops" }
+litert-tensorflow-ops = { group = "org.tensorflow", name = "tensorflow-lite-select-tf-ops", version.ref = "tflite" }
+tflite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tflite" }
 litert = { group = "com.google.ai.edge.litert", name = "litert", version.ref = "litert" }
 litert-support = { group = "com.google.ai.edge.litert", name = "litert-support", version.ref = "litert" }
 litert-metadata = { group = "com.google.ai.edge.litert", name = "litert-metadata", version.ref = "litert" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+aznavrail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "aznavrail" }
 
 
 [plugins]

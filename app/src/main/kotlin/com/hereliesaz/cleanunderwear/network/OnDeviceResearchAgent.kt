@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.flex.FlexDelegate
 import java.io.FileInputStream
 import java.net.URLEncoder
 import java.nio.MappedByteBuffer
@@ -30,8 +31,15 @@ class OnDeviceResearchAgent @Inject constructor(
     init {
         try {
             val modelBuffer = loadModelFile("research_agent.tflite")
-            interpreter = Interpreter(modelBuffer)
-            DiagnosticLogger.log("Intelligence Agent: Model loaded successfully.")
+            
+            // Fix: Explicitly add FlexDelegate to support complex ops like FlexStringLower
+            // We use the traditional TFLite namespace as it is currently bundled with the Flex delegate.
+            val options = Interpreter.Options().apply {
+                addDelegate(FlexDelegate())
+            }
+            
+            interpreter = Interpreter(modelBuffer, options)
+            DiagnosticLogger.log("Intelligence Agent: Model loaded successfully with Flex support.")
         } catch (e: Exception) {
             DiagnosticLogger.log("Intelligence Agent Error: Failed to load LiteRT model. ${e.message}", DiagnosticLogger.LogEntry.LogLevel.ERROR)
             interpreter = null
@@ -68,9 +76,11 @@ class OnDeviceResearchAgent @Inject constructor(
         if (text.isBlank() || text == "Unnamed Entity") return false
         
         // Secondary Heuristic: A real name usually has at least one space and no numbers
+        // Or if it's a single word, it should be alphabetic and longer than 1 char (e.g. "Az")
         val hasSpace = text.trim().contains(" ")
+        val isAlphaOnly = text.all { it.isLetter() }
         val hasNoDigits = text.none { it.isDigit() }
-        val looksLikeName = hasSpace && hasNoDigits
+        val looksLikeName = (hasSpace || (text.length > 1 && isAlphaOnly)) && hasNoDigits
 
         val score = scoreWithModel(text)
         

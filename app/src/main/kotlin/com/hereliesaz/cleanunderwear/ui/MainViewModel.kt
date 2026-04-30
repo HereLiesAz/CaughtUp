@@ -91,6 +91,9 @@ class MainViewModel @Inject constructor(
     private val _globalTargetLimit = kotlinx.coroutines.flow.MutableStateFlow(prefs.getInt("global_limit", 100))
     val globalTargetLimit: StateFlow<Int> = _globalTargetLimit
 
+    private val _showManualEntryDialog = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val showManualEntryDialog: StateFlow<Boolean> = _showManualEntryDialog
+
     data class OperationState(
         val isRunning: Boolean = false,
         val description: String = "",
@@ -233,6 +236,10 @@ class MainViewModel @Inject constructor(
     fun setGlobalTargetLimit(limit: Int) {
         prefs.edit { putInt("global_limit", limit) }
         _globalTargetLimit.value = limit
+    }
+
+    fun setShowManualEntryDialog(show: Boolean) {
+        _showManualEntryDialog.value = show
     }
 
     fun addManualTarget(name: String, phone: String?, email: String?) {

@@ -29,8 +29,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TargetListScreen(
     viewModel: MainViewModel,
-    onTargetClick: (Int) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onTargetClick: (Int) -> Unit
 ) {
     val targets by viewModel.targets.collectAsState()
     val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
@@ -46,25 +45,19 @@ fun TargetListScreen(
     val metaFilter by viewModel.metaFilter.collectAsState()
     val appleFilter by viewModel.appleFilter.collectAsState()
     val deviceFilter by viewModel.deviceFilter.collectAsState()
+    val showManualEntryDialog by viewModel.showManualEntryDialog.collectAsState()
+
     var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
     val selectedTargetForActions = targets.find { it.id == selectedTargetIdForActions }
     val sheetState = rememberModalBottomSheetState()
     
-    var showManualEntryDialog by remember { mutableStateOf(false) }
-
     Scaffold(
         topBar = {
             Column {
                 TopAppBar(
                     title = { Text("The Registry") },
                     actions = {
-                        IconButton(onClick = { viewModel.sweepContacts() }) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = "Harvest Contacts")
-                        }
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
-                        }
                         IconButton(onClick = { showSortMenu = true }) {
                             Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
                         }
@@ -117,26 +110,6 @@ fun TargetListScreen(
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
-                }
-            }
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                FloatingActionButton(
-                    onClick = { showManualEntryDialog = true },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Icon(Icons.Default.PersonAdd, contentDescription = "Manual Entry")
-                }
-                
-                FloatingActionButton(
-                    onClick = { viewModel.triggerManualInterrogation() },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Force Interrogation")
                 }
             }
         }
@@ -244,10 +217,10 @@ fun TargetListScreen(
 
     if (showManualEntryDialog) {
         ManualEntryDialog(
-            onDismiss = { showManualEntryDialog = false },
+            onDismiss = { viewModel.setShowManualEntryDialog(false) },
             onConfirm = { name, phone, email ->
                 viewModel.addManualTarget(name, phone, email)
-                showManualEntryDialog = false
+                viewModel.setShowManualEntryDialog(false)
             }
         )
     }

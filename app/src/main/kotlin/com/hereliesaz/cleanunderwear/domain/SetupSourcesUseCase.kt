@@ -1,13 +1,17 @@
 package com.hereliesaz.cleanunderwear.domain
 
+import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
-import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
+import kotlin.random.Random
 
 /**
  * The initial interrogation. 
@@ -17,6 +21,8 @@ class SetupSourcesUseCase @Inject constructor(
     private val repository: TargetRepository,
     private val researchAgent: OnDeviceResearchAgent
 ) {
+    private val areaSemaphore = Semaphore(2) // Reduced concurrency to mitigate 429s
+
     suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }) = coroutineScope {
         val targets = repository.getAllTargets().first()
         if (targets.isEmpty()) {
@@ -33,32 +39,41 @@ class SetupSourcesUseCase @Inject constructor(
 
         uniqueAreas.map { areaKey ->
             async {
-                val areaTargets = targetsByArea[areaKey] ?: return@async
-                val first = areaTargets.first()
-                val areaDisplayName = first.residenceInfo ?: "Area Code ${first.areaCode ?: "Unknown"}"
-                
-                DiagnosticLogger.log("Scanning Area: $areaDisplayName")
-                
-                // 1. Arrest Source Search
-                val areaLockupUrl = researchAgent.getDynamicLockupUrl(first.areaCode, first.residenceInfo)
-                
-                // 2. Obituary Source Search
-                val areaObitUrl = researchAgent.getDynamicObituaryUrl(first.areaCode, first.residenceInfo)
+                areaSemaphore.withPermit {
+                    // Add a random jitter delay (2-5 seconds) before each area search to bypass bot detection
+                    delay(Random.nextLong(2000, 5000))
+                    
+                    val areaTargets = targetsByArea[areaKey] ?: return@async
+                    val first = areaTargets.first()
+                    val areaDisplayName = first.residenceInfo ?: "Area Code ${first.areaCode ?: "Unknown"}"
+                    
+                    // 1. Arrest Source Search
+                    onProgress(completedAreas.toFloat() / totalAreas, "Locating arrest roster for $areaDisplayName...")
+                    val areaLockupUrl = researchAgent.getDynamicLockupUrl(first.areaCode, first.residenceInfo)
+                    
+                    delay(Random.nextLong(1000, 3000)) // Delay between different search types
 
-                // Apply these sources to EVERYONE in this area who is missing them
-                areaTargets.forEach { target ->
-                    if (target.lockupUrl == null || target.obituaryUrl == null) {
-                        repository.updateTarget(
-                            target.copy(
-                                lockupUrl = target.lockupUrl ?: areaLockupUrl,
-                                obituaryUrl = target.obituaryUrl ?: areaObitUrl
+                    // 2. Obituary Source Search
+                    onProgress(completedAreas.toFloat() / totalAreas, "Locating obituary registry for $areaDisplayName...")
+                    val areaObitUrl = researchAgent.getDynamicObituaryUrl(first.areaCode, first.residenceInfo)
+
+                    // Apply these sources to EVERYONE in this area who is missing them
+                    areaTargets.forEach { target ->
+                        if (target.lockupUrl == null || target.obituaryUrl == null) {
+                            repository.updateTarget(
+                                target.copy(
+                                    lockupUrl = target.lockupUrl ?: areaLockupUrl,
+                                    obituaryUrl = target.obituaryUrl ?: areaObitUrl
+                                )
                             )
-                        )
+                        }
                     }
+                    
+                    synchronized(this@coroutineScope) {
+                        completedAreas++
+                    }
+                    onProgress(completedAreas.toFloat() / totalAreas, "Sources established for $areaDisplayName.")
                 }
-                
-                completedAreas++
-                onProgress(completedAreas.toFloat() / totalAreas, "Linking sources for $areaDisplayName...")
             }
         }.awaitAll()
         

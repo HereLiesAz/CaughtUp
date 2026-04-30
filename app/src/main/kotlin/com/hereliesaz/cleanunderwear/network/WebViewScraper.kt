@@ -17,8 +17,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 /**
  * A Trojan horse for Cloudflare's digital bouncer. 
@@ -32,7 +32,7 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
     suspend fun scrapeGhostTown(url: String): Document? = withContext(Dispatchers.Main) {
         DiagnosticLogger.log("Opening Covert Browser for: $url")
         withTimeoutOrNull(30000L) { // 30 second timeout for the entire operation
-            suspendCoroutine { continuation ->
+            suspendCancellableCoroutine { continuation ->
                 val webView = WebView(context)
                 var isResumed = false
 
@@ -41,10 +41,17 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                         isResumed = true
                         continuation.resume(doc)
                         webView.post { 
-                            webView.stopLoading()
-                            webView.destroy() 
+                            try {
+                                webView.stopLoading()
+                                webView.clearHistory()
+                                webView.destroy() 
+                            } catch (e: Exception) {}
                         }
                     }
+                }
+                
+                continuation.invokeOnCancellation {
+                    resumeOnce(null)
                 }
 
                 webView.settings.apply {

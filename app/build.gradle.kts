@@ -149,6 +149,9 @@ dependencies {
     implementation(libs.coil.compose)
 
     // On-Device AI
-    implementation(libs.litert)
+    implementation(libs.tflite)
     implementation(libs.litert.tensorflow.ops)
+
+    // Thumb-Driven Navigation
+    implementation(libs.aznavrail)
 }
