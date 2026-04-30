@@ -1,19 +1,13 @@
 package com.hereliesaz.cleanunderwear.ui
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,7 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.hereliesaz.aznavrail.*
-import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.cleanunderwear.data.Target
 
 @Composable
@@ -33,7 +27,15 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
     val currentDestination = navBackStackEntry?.destination
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    val operationState by viewModel.operationState.collectAsState()
+    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val showDiagnosticLog by viewModel.showDiagnosticLog.collectAsState()
+    val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
+
     val activeColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val backgroundColor = MaterialTheme.colorScheme.background
 
     AzHostActivityLayout(
         navController = navController,
@@ -42,41 +44,61 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         isLandscape = isLandscape,
         initiallyExpanded = false
     ) {
-        if (isOnboardingCompleted) {
-            azConfig(dockingSide = AzDockingSide.LEFT)
-            azTheme(activeColor = activeColor)
+        azConfig(
+            dockingSide = AzDockingSide.LEFT,
+            packButtons = true
+        )
+        
+        azTheme(
+            activeColor = activeColor,
+            translucentBackground = backgroundColor.copy(alpha = 0.90f)
+        )
 
+        azAdvanced(
+            isLoading = operationState.isRunning,
+            helpEnabled = true,
+            helpList = mapOf(
+                "registry" to "Your primary surveillance ledger.",
+                "ingest" to "Manual entry for targets that evade automated harvesting.",
+                "harvest" to "Deep scythe across all connected social and system databases.",
+                "interrogate" to "Force a real-time check against public rosters."
+            )
+        )
+
+        if (isOnboardingCompleted) {
             azRailItem(
                 id = "registry",
                 text = "Registry",
                 route = "targetList",
-                content = Icons.Default.People,
-                info = "View your local surveillance registry."
-            )
-            
-            azRailItem(
-                id = "manual_entry",
-                text = "Ingest",
-                content = Icons.Default.Add,
-                info = "Manually ingest a new target into the ledger.",
-                onClick = { viewModel.setShowManualEntryDialog(true) }
+                content = Icons.Default.Groups,
+                info = "View the complete surveillance list."
             )
 
-            azRailItem(
-                id = "harvest",
-                text = "Harvest",
-                content = Icons.Default.PersonAdd,
-                info = "Scythe through local databases for new targets.",
-                onClick = { viewModel.sweepContacts() }
-            )
-            
-            azRailItem(
-                id = "interrogate",
-                text = "Interrogate",
-                content = Icons.Default.Refresh,
-                info = "Force a real-time interrogation of municipal rosters.",
-                onClick = { viewModel.triggerManualInterrogation() }
-            )
+            azNestedRail(
+                id = "intelligence_ops",
+                text = "Ops",
+                content = Icons.Default.Analytics,
+                alignment = AzNestedRailAlignment.VERTICAL
+            ) {
+                azRailItem(
+                    id = "ingest",
+                    text = "Ingest",
+                    content = Icons.Default.PersonAdd,
+                    onClick = { viewModel.setShowManualEntryDialog(true) }
+                )
+                azRailItem(
+                    id = "harvest",
+                    text = "Harvest",
+                    content = Icons.Default.Radar,
+                    onClick = { viewModel.sweepContacts() }
+                )
+                azRailItem(
+                    id = "interrogate",
+                    text = "Interrogate",
+                    content = Icons.Default.SavedSearch,
+                    onClick = { viewModel.triggerManualInterrogation() }
+                )
+            }
 
             azDivider()
 
@@ -84,9 +106,25 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 id = "settings",
                 text = "Settings",
                 route = "settings",
-                content = Icons.Default.Settings,
-                info = "Configure surveillance parameters and covert mode."
+                content = Icons.Default.Settings
             )
+            
+            azMenuToggle(
+                id = "diagnostic_log",
+                isChecked = showDiagnosticLog,
+                toggleOnText = "Hide Activity Log",
+                toggleOffText = "Show Activity Log",
+                onClick = { viewModel.setShowDiagnosticLog(!showDiagnosticLog) }
+            )
+        }
+
+        background(weight = 0) {
+            // Diagnostic log as a background layer that peeks through
+            if (showDiagnosticLog) {
+                Box(Modifier.fillMaxSize()) {
+                    DiagnosticLogView(logs = diagnosticLogs)
+                }
+            }
         }
 
         onscreen {
@@ -120,7 +158,6 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                     arguments = listOf(navArgument("targetId") { type = NavType.IntType })
                 ) { backStackEntry ->
                     val targetId = backStackEntry.arguments?.getInt("targetId") ?: return@composable
-
                     val targets by viewModel.targets.collectAsState()
                     val target = targets.find { it.id == targetId }
 

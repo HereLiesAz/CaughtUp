@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.aznavrail.*
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -39,7 +40,8 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                 Text("Skip")
             }
             
-            Button(
+            AzButton(
+                text = if (pagerState.currentPage == 3) "Start Vigil" else "Next",
                 onClick = {
                     if (pagerState.currentPage < 3) {
                         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
@@ -47,9 +49,7 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                         onComplete()
                     }
                 }
-            ) {
-                Text(if (pagerState.currentPage == 3) "Get Started" else "Next")
-            }
+            )
         }
     }
 }

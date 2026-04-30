@@ -1,6 +1,10 @@
 package com.hereliesaz.cleanunderwear.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import android.content.Intent
@@ -9,8 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.aznavrail.*
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import com.hereliesaz.cleanunderwear.util.CyberBackgroundChecks
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,7 +33,12 @@ fun TargetDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Details: ${target.displayName}") },
+                title = { Text("Intelligence Profile: ${target.displayName}") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -39,7 +50,8 @@ fun TargetDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -82,14 +94,18 @@ fun TargetDetailScreen(
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 target.lockupUrl?.let { url ->
-                    TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }) {
-                        Text("Public Records / Roster")
-                    }
+                    AzButton(
+                        text = "Public Records / Roster",
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 target.obituaryUrl?.let { url ->
-                    TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }) {
-                        Text("Obituary Registry")
-                    }
+                    AzButton(
+                        text = "Obituary Registry",
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
@@ -105,15 +121,14 @@ fun TargetDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf(6, 12, 24, 48).forEach { hours ->
-                    FilterChip(
-                        selected = target.checkFrequencyHours == hours,
-                        onClick = { 
-                            onUpdateTarget(target.copy(checkFrequencyHours = hours))
-                        },
-                        label = { Text("${hours}h") }
-                    )
-                }
+                AzRoller(
+                    options = listOf(6, 12, 24, 48).map { "${it}h" },
+                    selectedOption = "${target.checkFrequencyHours}h",
+                    onOptionSelected = { hoursText ->
+                        val hours = hoursText.removeSuffix("h").toInt()
+                        onUpdateTarget(target.copy(checkFrequencyHours = hours))
+                    }
+                )
             }
 
             if (target.lastVerificationSnippet != null) {
@@ -140,32 +155,72 @@ fun TargetDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            TextButton(
+                            AzButton(
+                                text = "Incorrect Match",
                                 onClick = { 
-                                    // Rejected: Move back to monitoring
                                     onUpdateTarget(target.copy(
                                         status = TargetStatus.MONITORING,
                                         lastVerificationSnippet = null
                                     ))
-                                }
-                            ) {
-                                Text("Incorrect Match / Only Mentioned")
-                            }
-                            Button(
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            AzButton(
+                                text = "Confirm Match",
                                 onClick = { 
-                                    // Confirmed: No action needed besides maybe clearing snippet or keeping it as proof
-                                }
-                            ) {
-                                Text("Confirm Match")
-                            }
+                                    // Confirmed
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            HorizontalDivider()
+            
+            Text(
+                text = "External Deep Interrogation",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-            Button(
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AssistChip(
+                    onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getNameSearchUrl(target.displayName)))) },
+                    label = { Text("Name Check") }
+                )
+                
+                target.phoneNumber?.let { phone ->
+                    AssistChip(
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getPhoneSearchUrl(phone)))) },
+                        label = { Text("Phone Check") }
+                    )
+                }
+
+                target.email?.let { email ->
+                    AssistChip(
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getEmailSearchUrl(email)))) },
+                        label = { Text("Email Check") }
+                    )
+                }
+
+                target.residenceInfo?.let { addr ->
+                    AssistChip(
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getAddressSearchUrl(addr)))) },
+                        label = { Text("Address Check") }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            AzButton(
+                text = "General News Search",
                 onClick = {
                     try {
                         val query = "${target.displayName} ${target.residenceInfo ?: ""}".trim()
@@ -177,9 +232,7 @@ fun TargetDetailScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("General News Search")
-            }
+            )
         }
     }
 }

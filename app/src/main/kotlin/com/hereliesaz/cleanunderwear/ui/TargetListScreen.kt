@@ -8,19 +8,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import kotlinx.coroutines.launch
@@ -32,10 +32,8 @@ fun TargetListScreen(
     onTargetClick: (Int) -> Unit
 ) {
     val targets by viewModel.targets.collectAsState()
-    val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
-    val showDiagnosticLog by viewModel.showDiagnosticLog.collectAsState()
-    val operationState by viewModel.operationState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortOrder by viewModel.sortOrder.collectAsState()
     val showIgnored by viewModel.showIgnored.collectAsState()
     val namelessFilter by viewModel.showNamelessFilter.collectAsState()
     val emailOnlyFilter by viewModel.showEmailOnlyFilter.collectAsState()
@@ -47,170 +45,88 @@ fun TargetListScreen(
     val deviceFilter by viewModel.deviceFilter.collectAsState()
     val showManualEntryDialog by viewModel.showManualEntryDialog.collectAsState()
 
-    var showSortMenu by rememberSaveable { mutableStateOf(false) }
     var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
     val selectedTargetForActions = targets.find { it.id == selectedTargetIdForActions }
     val sheetState = rememberModalBottomSheetState()
     
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = { Text("Was their underwear clean?") },
-                    actions = {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort")
-                        }
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            MainViewModel.SortOrder.entries.forEach { order ->
-                                DropdownMenuItem(
-                                    text = { Text("Sort by ${order.name.lowercase().replaceFirstChar { it.uppercase() }}") },
-                                    onClick = { 
-                                        viewModel.setSortOrder(order)
-                                        showSortMenu = false
-                                    }
-                                )
-                            }
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text(if (showIgnored) "Hide Ignored" else "Show Ignored") },
-                                onClick = { 
-                                    viewModel.toggleShowIgnored()
-                                    showSortMenu = false
-                                }
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+    Column(modifier = Modifier.fillMaxSize()) {
+        AzTextBox(
+            value = searchQuery,
+            onValueChange = { viewModel.setSearchQuery(it) },
+            hint = "Interrogate Registry...",
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            historyContext = "registry_search",
+            onSubmit = { viewModel.setSearchQuery(it) }
+        )
 
-                if (operationState.isRunning) {
-                    LinearProgressIndicator(
-                        progress = { if (operationState.progress >= 0f) operationState.progress else 0f },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.secondary,
-                        trackColor = MaterialTheme.colorScheme.secondaryContainer,
-                    )
-                    
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ) {
-                        Text(
-                            text = operationState.description,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Sort:", style = MaterialTheme.typography.labelSmall)
+            AzCycler(
+                options = MainViewModel.SortOrder.entries.map { it.name },
+                selectedOption = sortOrder.name,
+                onCycle = { name -> 
+                    viewModel.setSortOrder(MainViewModel.SortOrder.valueOf(name))
                 }
-            }
-        }
-    ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Find someone...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                shape = MaterialTheme.shapes.medium
             )
+            
+            AzToggle(
+                isChecked = showIgnored,
+                onToggle = { viewModel.toggleShowIgnored() },
+                toggleOnText = "Hide Archived",
+                toggleOffText = "Show Archived"
+            )
+        }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Account Source Filters
+            TriStateFilterChip(state = googleFilter, onToggle = { viewModel.setGoogleFilter(it) }, label = "Google")
+            TriStateFilterChip(state = metaFilter, onToggle = { viewModel.setMetaFilter(it) }, label = "Meta")
+            TriStateFilterChip(state = appleFilter, onToggle = { viewModel.setAppleFilter(it) }, label = "Apple")
+            TriStateFilterChip(state = deviceFilter, onToggle = { viewModel.setDeviceFilter(it) }, label = "Local")
+            VerticalDivider(modifier = Modifier.height(32.dp).align(Alignment.CenterVertically))
+            TriStateFilterChip(state = namelessFilter, onToggle = { viewModel.setNamelessFilter(it) }, label = "Nameless")
+            TriStateFilterChip(state = emailOnlyFilter, onToggle = { viewModel.setEmailOnlyFilter(it) }, label = "Email Only")
+            TriStateFilterChip(state = hasEmailFilter, onToggle = { viewModel.setEmailFilter(it) }, label = "Email")
+            TriStateFilterChip(state = hasAddressFilter, onToggle = { viewModel.setAddressFilter(it) }, label = "Address")
+        }
+
+        if (targets.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                // Account Source Filters
-                TriStateFilterChip(
-                    state = googleFilter,
-                    onToggle = { viewModel.setGoogleFilter(it) },
-                    label = "Google"
-                )
-                TriStateFilterChip(
-                    state = metaFilter,
-                    onToggle = { viewModel.setMetaFilter(it) },
-                    label = "Meta"
-                )
-                TriStateFilterChip(
-                    state = appleFilter,
-                    onToggle = { viewModel.setAppleFilter(it) },
-                    label = "Apple"
-                )
-                TriStateFilterChip(
-                    state = deviceFilter,
-                    onToggle = { viewModel.setDeviceFilter(it) },
-                    label = "Local"
-                )
-
-                VerticalDivider(modifier = Modifier.height(32.dp).align(Alignment.CenterVertically))
-
-                // Nameless Filter
-                TriStateFilterChip(
-                    state = namelessFilter,
-                    onToggle = { viewModel.setNamelessFilter(it) },
-                    label = "Nameless"
-                )
-                
-                // Email Only Filter
-                TriStateFilterChip(
-                    state = emailOnlyFilter,
-                    onToggle = { viewModel.setEmailOnlyFilter(it) },
-                    label = "Email Only"
-                )
-
-                // Has Email Filter
-                TriStateFilterChip(
-                    state = hasEmailFilter,
-                    onToggle = { viewModel.setEmailFilter(it) },
-                    label = "Email"
-                )
-                
-                // Has Address Filter
-                TriStateFilterChip(
-                    state = hasAddressFilter,
-                    onToggle = { viewModel.setAddressFilter(it) },
-                    label = "Address"
-                )
+                Text("The surveillance ledger is currently blank.")
             }
-
-            if (targets.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("The registry is currently empty.")
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(targets, key = { it.id }) { target ->
+                    TargetItem(
+                        target = target, 
+                        onClick = { onTargetClick(target.id) },
+                        onLongClick = { selectedTargetIdForActions = target.id }
+                    )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(targets, key = { it.id }) { target ->
-                        TargetItem(
-                            target = target, 
-                            onClick = { onTargetClick(target.id) },
-                            onLongClick = { selectedTargetIdForActions = target.id }
-                        )
-                    }
-                }
-            }
-
-            if (showDiagnosticLog) {
-                DiagnosticLogView(logs = diagnosticLogs)
             }
         }
     }
@@ -228,7 +144,8 @@ fun TargetListScreen(
     if (selectedTargetForActions != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedTargetIdForActions = null },
-            sheetState = sheetState
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             TargetActionMenu(
                 target = selectedTargetForActions,
@@ -486,36 +403,38 @@ fun ManualEntryDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
+                
+                AzTextBox(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Target Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    hint = "Target Name",
+                    modifier = Modifier.fillMaxWidth(),
+                    onSubmit = {}
                 )
-                OutlinedTextField(
+                AzTextBox(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("Phone Number") },
-                    modifier = Modifier.fillMaxWidth()
+                    hint = "Phone Number",
+                    modifier = Modifier.fillMaxWidth(),
+                    onSubmit = {}
                 )
-                OutlinedTextField(
+                AzTextBox(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Intelligence Email") },
-                    modifier = Modifier.fillMaxWidth()
+                    hint = "Intelligence Email",
+                    modifier = Modifier.fillMaxWidth(),
+                    onSubmit = {}
+                )
+                
+                AzButton(
+                    text = "Ingest Target",
+                    onClick = { onConfirm(name, phone.takeIf { it.isNotBlank() }, email.takeIf { it.isNotBlank() }) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    enabled = name.isNotBlank() && (phone.isNotBlank() || email.isNotBlank())
                 )
             }
         },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    onConfirm(name, phone.takeIf { it.isNotBlank() }, email.takeIf { it.isNotBlank() })
-                },
-                enabled = name.isNotBlank() && (phone.isNotBlank() || email.isNotBlank())
-            ) {
-                Text("Ingest Target")
-            }
-        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
@@ -526,12 +445,12 @@ fun ManualEntryDialog(
 
 @Composable
 fun StatusBadge(status: TargetStatus) {
-    val (color, text) = when (status) {
-        TargetStatus.MONITORING -> MaterialTheme.colorScheme.primary to "Monitoring"
-        TargetStatus.INCARCERATED -> MaterialTheme.colorScheme.error to "Incarcerated"
-        TargetStatus.DECEASED -> MaterialTheme.colorScheme.outline to "Deceased"
-        TargetStatus.IGNORED -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f) to "Archived"
-        TargetStatus.UNKNOWN -> MaterialTheme.colorScheme.secondary to "Checking..."
+    val (color: Color, text: String) = when (status) {
+        TargetStatus.MONITORING -> VerifiedGreen to "Monitoring"
+        TargetStatus.INCARCERATED -> WarningRed to "Incarcerated"
+        TargetStatus.DECEASED -> Color.Gray to "Deceased"
+        TargetStatus.IGNORED -> Color.LightGray to "Archived"
+        TargetStatus.UNKNOWN -> IntelligenceGold to "Checking..."
     }
 
     Surface(

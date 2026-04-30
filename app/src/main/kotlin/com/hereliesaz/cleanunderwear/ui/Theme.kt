@@ -1,0 +1,43 @@
+package com.hereliesaz.cleanunderwear.ui
+
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
+
+val NeonCyan = Color(0xFF00E5FF)
+val DeepSlate = Color(0xFF0D1117)
+val IntelligenceGold = Color(0xFFFFB300)
+val SurveillanceGrey = Color(0xFF1C1F26)
+val CircuitBlue = Color(0xFF00838F)
+val VerifiedGreen = Color(0xFF00E676)
+val WarningRed = Color(0xFFFF5252)
+
+val SurveillanceDarkColorScheme = darkColorScheme(
+    primary = NeonCyan,
+    secondary = CircuitBlue,
+    tertiary = IntelligenceGold,
+    background = DeepSlate,
+    surface = SurveillanceGrey,
+    onPrimary = Color.Black,
+    onSecondary = Color.White,
+    onTertiary = Color.Black,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    error = WarningRed,
+    secondaryContainer = CircuitBlue.copy(alpha = 0.3f),
+    onSecondaryContainer = Color.White
+)
+
+val SurveillanceLightColorScheme = lightColorScheme(
+    primary = CircuitBlue,
+    secondary = NeonCyan,
+    tertiary = IntelligenceGold,
+    background = Color(0xFFF5F7F9),
+    surface = Color.White,
+    onPrimary = Color.White,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
+    onBackground = DeepSlate,
+    onSurface = DeepSlate,
+    error = Color(0xFFD32F2F)
+)

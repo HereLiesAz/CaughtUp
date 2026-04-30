@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.hereliesaz.cleanunderwear.ui.MainViewModel
 import com.hereliesaz.cleanunderwear.ui.CleanUnderwearApp
+import com.hereliesaz.cleanunderwear.ui.SurveillanceDarkColorScheme
+import com.hereliesaz.cleanunderwear.ui.SurveillanceLightColorScheme
 import com.hereliesaz.cleanunderwear.util.GitHubCrashReporter
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -47,7 +49,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
-            val colorScheme = if (isDarkTheme) darkColorScheme() else lightColorScheme()
+            val colorScheme = if (isDarkTheme) SurveillanceDarkColorScheme else SurveillanceLightColorScheme
 
             MaterialTheme(colorScheme = colorScheme) {
                 Surface(

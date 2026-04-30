@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.hereliesaz.aznavrail.*
+import com.hereliesaz.aznavrail.model.AzButtonShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,9 +76,11 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = isDarkTheme,
-                    onCheckedChange = { viewModel.setDarkTheme(it) }
+                AzToggle(
+                    isChecked = isDarkTheme,
+                    onToggle = { viewModel.setDarkTheme(it) },
+                    toggleOnText = "Dark",
+                    toggleOffText = "Light"
                 )
             }
 
@@ -93,24 +97,26 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = showDiagnosticLog,
-                    onCheckedChange = { viewModel.setShowDiagnosticLog(it) }
+                AzToggle(
+                    isChecked = showDiagnosticLog,
+                    onToggle = { viewModel.setShowDiagnosticLog(it) },
+                    toggleOnText = "Log On",
+                    toggleOffText = "Log Off"
                 )
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Global Surveillance Limit", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "Maximum number of targets to keep in the active registry. Current: $globalLimit",
+                    "Maximum number of targets to keep in the active registry.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Slider(
-                    value = globalLimit.toFloat(),
-                    onValueChange = { viewModel.setGlobalTargetLimit(it.toInt()) },
-                    valueRange = 10f..500f,
-                    steps = 49
+                
+                AzRoller(
+                    options = listOf(50, 100, 250, 500).map { it.toString() },
+                    selectedOption = globalLimit.toString(),
+                    onOptionSelected = { viewModel.setGlobalTargetLimit(it.toInt()) }
                 )
             }
 
@@ -134,7 +140,8 @@ fun SettingsScreen(
                 )
             }
 
-            Button(
+            AzButton(
+                text = "Manage App Permissions",
                 onClick = {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", context.packageName, null)
@@ -142,9 +149,7 @@ fun SettingsScreen(
                     context.startActivity(intent)
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Manage App Permissions")
-            }
+            )
 
             HorizontalDivider()
 
@@ -160,7 +165,8 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Button(
+            AzButton(
+                text = "Connect New Account",
                 onClick = {
                     val intent = Intent(Settings.ACTION_ADD_ACCOUNT).apply {
                         putExtra(Settings.EXTRA_AUTHORITIES, arrayOf("com.android.contacts"))
@@ -168,17 +174,14 @@ fun SettingsScreen(
                     context.startActivity(intent)
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Connect New Account")
-            }
+            )
             
-            Button(
+            AzButton(
+                text = "Interrogate Facebook Social Graph",
                 onClick = { viewModel.harvestFacebook() },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Text("Interrogate Facebook Social Graph")
-            }
+                shape = AzButtonShape.RECTANGLE
+            )
 
             HorizontalDivider()
         }
