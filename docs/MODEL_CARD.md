@@ -4,21 +4,17 @@
 A lightweight text classification model built with TensorFlow/Keras and converted to TFLite for on-device inference in the CleanUnderwear Android app.
 
 ## Capabilities
-- **Objective**: Distinguish between official/legal/obituary sources and social/commercial noise.
+- **Primary Objective**: Distinguish between official/legal/obituary sources and social/commercial noise.
+- **Legal & Court Detection**: Specifically trained to recognize patterns from PACER, state judicial branches, and clerk of court search results.
+- **Obituary Intelligence**: Recognizes funeral home memorials and major obituary databases (Legacy, Dignity Memorial, NOLA.com).
+- **Nickname Resilience**: Trained to maintain high accuracy across multi-cultural naming variations and common nicknames (e.g., Robert/Bob/Bobby, William/Bill/Billy).
+
+## Input/Output
 - **Input**: Raw text strings (Search result snippets).
-- **Output**: Sigmoid confidence score (0.0 - 1.0).
+- **Output**: Sigmoid confidence score (0.0 - 1.0). Threshold > 0.5 for official sources.
 
-## Training Data
-- **Positive Classes**: .gov domains, official sheriff rosters, court filing portals (PACER), verify obituary databases (Legacy.com), and funeral home patterns.
-- **Negative Classes**: Social media profiles (FB, Twitter, LinkedIn), e-commerce listings (Amazon), and general blogs.
-- **Name Logic**: Trained specifically on multi-cultural name variations (Western, Hispanic, African American, East Asian, and Middle Eastern naming conventions).
-
-## Performance
-- **Accuracy**: 100% on finalized synthetic test set.
-- **Precision/Recall**: Balanced 1.0/1.0 across both target and noise categories.
-
-## Assets Linked
-- `research_agent.tflite` (Model)
-- `research_agent_vocab.txt` (Vocab)
-- `nicknames.json` (Expansion Logic)
-- `scraper_triggers.json` (Regional Prioritization)
+## Assets Included
+- `research_agent.tflite` (Optimized Model)
+- `research_agent_vocab.txt` (Preprocessing Vocabulary)
+- `nicknames.json` (Demographic-specific nickname mapping)
+- `scraper_triggers.json` (Regional area code and source prioritization)

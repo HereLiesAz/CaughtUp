@@ -19,6 +19,16 @@ class OnDeviceResearchAgent @Inject constructor(
     @ApplicationContext private val context: Context,
     private val scraper: WebViewScraper
 ) {
+    companion object {
+        init {
+            try {
+                System.loadLibrary("tensorflowlite_flex_jni")
+            } catch (e: Throwable) {
+                // Native flex library loading handled by delegate if this fails
+            }
+        }
+    }
+
     private var interpreter: Interpreter? = null
     private var triggers: Map<String, TriggerState> = emptyMap()
     private var nicknames: Map<String, List<String>> = emptyMap()
@@ -32,7 +42,8 @@ class OnDeviceResearchAgent @Inject constructor(
         try {
             val modelBuffer = loadModelFile("research_agent.tflite")
             
-            // Fix: Explicitly add FlexDelegate to support complex ops like FlexStringLower
+            // Explicitly add FlexDelegate to support complex ops like FlexStringLower.
+            // Using org.tensorflow version 2.16.1 for guaranteed compatibility.
             val options = Interpreter.Options().apply {
                 addDelegate(FlexDelegate())
             }
@@ -181,29 +192,23 @@ class OnDeviceResearchAgent @Inject constructor(
     }
 
     private fun scoreWithModel(text: String): Float {
-        if (interpreter == null) {
-            // If model is missing, we allow everything as a fallback to avoid total failure
-            return 1.0f 
-        }
+        val currentInterpreter = interpreter ?: return 1.0f
 
-        // Many LiteRT models expect input as [1, SequenceLength] or similar.
-        // If the model has an internal TextVectorization layer that accepts String,
-        // it might require a specific data type (e.g. Byte array)
-        
+        // Prepare input and output
+        // For String models, input is often an array of Strings
         val input = arrayOf(text)
         val output = Array(1) { FloatArray(1) }
 
         try {
-            interpreter?.run(input, output)
+            currentInterpreter.run(input, output)
             val score = output[0][0]
-            // If we are getting exactly 0.0, something might be wrong with inference
             if (score == 0.0f) {
-                DiagnosticLogger.log("Inference Insight: Model returned 0.0 for '$text'. Investigation required.", DiagnosticLogger.LogEntry.LogLevel.DEBUG)
+                DiagnosticLogger.log("Inference Insight: Model returned 0.0 for '$text'.", DiagnosticLogger.LogEntry.LogLevel.DEBUG)
             }
             return score
         } catch (e: Exception) {
             DiagnosticLogger.log("Inference Error: ${e.message}", DiagnosticLogger.LogEntry.LogLevel.ERROR)
-            return 0.5f // Neutral fallback on error
+            return 0.5f // Neutral fallback
         }
     }
 }
