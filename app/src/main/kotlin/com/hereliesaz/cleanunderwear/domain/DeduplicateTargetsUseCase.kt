@@ -23,21 +23,27 @@ class DeduplicateTargetsUseCase @Inject constructor(
     private val repository: TargetRepository
 ) {
     suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }): Int {
-        val all = repository.getAllTargetsLiteSnapshot()
-        if (all.size < 2) {
-            onProgress(1f, "Nothing to deduplicate")
-            return 0
-        }
-
-        val groups = mutableMapOf<String, MutableList<TargetLite>>()
-        for (t in all) {
-            val key = identityKey(t)
-            groups.getOrPut(key) { mutableListOf() }.add(t)
+        val groups = mutableMapOf<String, MutableList<Int>>() // identityKey -> list of IDs
+        
+        var offset = 0
+        val chunkSize = 1000
+        
+        // 1. Identify collision candidates using memory-efficient chunking
+        while (true) {
+            val chunk = repository.getTargetsPaged(chunkSize, offset)
+            if (chunk.isEmpty()) break
+            
+            for (t in chunk) {
+                val key = identityKey(t)
+                groups.getOrPut(key) { mutableListOf() }.add(t.id)
+            }
+            offset += chunkSize
+            onProgress(0.1f, "Scanning registry for duplicates ($offset)...")
         }
 
         val collisions = groups.values.filter { it.size > 1 }
         if (collisions.isEmpty()) {
-            onProgress(1f, "${all.size} targets, no duplicates")
+            onProgress(1f, "No duplicates found.")
             return 0
         }
 
@@ -45,13 +51,15 @@ class DeduplicateTargetsUseCase @Inject constructor(
         var merged = 0
         val totalSteps = collisions.size
 
-        for (group in collisions) {
-            val winnerLite = pickWinner(group)
-            val winnerFull = repository.getTargetById(winnerLite.id) ?: continue
-
-            val loserIds = group.filter { it.id != winnerLite.id }.map { it.id }
-            val losers = repository.getTargetsByIds(loserIds)
-            val mergedFull = losers.fold(winnerFull) { acc, loser -> mergeFields(acc, loser) }
+        // 2. Resolve collisions (only hydrating full rows for actual duplicates)
+        for (idGroup in collisions) {
+            val fullGroup = repository.getTargetsByIds(idGroup)
+            if (fullGroup.size < 2) continue
+            
+            val winner = pickWinnerFull(fullGroup)
+            val losers = fullGroup.filter { it.id != winner.id }
+            
+            val mergedFull = losers.fold(winner) { acc, loser -> mergeFields(acc, loser) }
             repository.updateTarget(mergedFull)
             for (loser in losers) {
                 repository.deleteTarget(loser)
@@ -61,12 +69,29 @@ class DeduplicateTargetsUseCase @Inject constructor(
             processed++
             onProgress(
                 processed.toFloat() / totalSteps,
-                "Merged duplicates of ${winnerLite.displayName}"
+                "Merging duplicates: ${winner.displayName}"
             )
         }
 
         DiagnosticLogger.log("Dedup: collapsed $merged duplicate row(s) across $totalSteps identities")
         return merged
+    }
+
+    private fun pickWinnerFull(group: List<Target>): Target {
+        return group.maxByOrNull { fullFieldScore(it) } ?: group.first()
+    }
+
+    private fun fullFieldScore(t: Target): Int {
+        var score = 0
+        if (t.displayName.isNotBlank() && t.displayName != "Unnamed Entity") score += 2
+        if (!t.phoneNumber.isNullOrBlank()) score++
+        if (!t.email.isNullOrBlank()) score++
+        if (!t.residenceInfo.isNullOrBlank()) score++
+        if (!t.areaCode.isNullOrBlank()) score++
+        if (t.lastScrapedTimestamp > 0) score++
+        if (t.lockupUrl != null) score++
+        if (t.obituaryUrl != null) score++
+        return score
     }
 
     private fun identityKey(t: TargetLite): String {
@@ -75,21 +100,6 @@ class DeduplicateTargetsUseCase @Inject constructor(
         val email = t.email?.lowercase()?.trim()?.takeIf { it.isNotBlank() }
         if (email != null) return "email:$email"
         return "name:${t.displayName.lowercase().trim()}"
-    }
-
-    private fun pickWinner(group: List<TargetLite>): TargetLite {
-        return group.maxByOrNull { fieldScore(it) } ?: group.first()
-    }
-
-    private fun fieldScore(t: TargetLite): Int {
-        var score = 0
-        if (t.displayName.isNotBlank() && t.displayName != "Unnamed Entity") score += 2
-        if (!t.phoneNumber.isNullOrBlank()) score++
-        if (!t.email.isNullOrBlank()) score++
-        if (!t.residenceInfo.isNullOrBlank()) score++
-        if (!t.areaCode.isNullOrBlank()) score++
-        if (t.lastScrapedTimestamp > 0) score++
-        return score
     }
 
     private fun mergeFields(into: Target, from: Target): Target {

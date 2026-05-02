@@ -1,5 +1,6 @@
 package com.hereliesaz.cleanunderwear.data
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -29,8 +30,8 @@ interface TargetDao {
 
     @Query(
         """
-        SELECT id, display_name, phone_number, area_code, status, email,
-               residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours
+        SELECT id, display_name, phone_number, area_code, status, email, 
+               last_status_change_timestamp, last_scraped_timestamp
         FROM targets 
         WHERE (display_name LIKE '%' || :query || '%' OR phone_number LIKE '%' || :query || '%' OR email LIKE '%' || :query || '%')
         AND (:showIgnored = 1 OR status != 'IGNORED')
@@ -73,14 +74,20 @@ interface TargetDao {
         hasAddressF: Boolean?,
         pendingEnrichF: Boolean?,
         sort: String
-    ): Flow<List<TargetLite>>
+    ): PagingSource<Int, TargetLite>
 
     @Query(
         "SELECT id, display_name, phone_number, area_code, status, email, " +
-            "residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours " +
-            "FROM targets ORDER BY display_name ASC"
+            "last_status_change_timestamp, last_scraped_timestamp " +
+            "FROM targets ORDER BY display_name ASC LIMIT :limit OFFSET :offset"
     )
-    suspend fun getAllTargetsLiteSnapshot(): List<TargetLite>
+    suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite>
+
+    @Query(
+        "SELECT id, display_name, phone_number, email, area_code, status, residence_info, " +
+            "source_account, monitorability_state, last_scraped_timestamp FROM targets"
+    )
+    suspend fun getAllTargetWorkInfo(): List<TargetWorkInfo>
 
     @Query("SELECT id, area_code, residence_info, lockup_url, obituary_url FROM targets")
     suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo>

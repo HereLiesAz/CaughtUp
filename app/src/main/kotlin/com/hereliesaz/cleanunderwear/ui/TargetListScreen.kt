@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,7 +35,7 @@ fun TargetListScreen(
     viewModel: MainViewModel,
     onTargetClick: (Int) -> Unit
 ) {
-    val targets by viewModel.targets.collectAsState()
+    val targets = viewModel.targets.collectAsLazyPagingItems()
     val operationState by viewModel.operationState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
@@ -49,7 +52,20 @@ fun TargetListScreen(
     val showManualEntryDialog by viewModel.showManualEntryDialog.collectAsState()
 
     var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
-    val selectedTargetForActions = targets.find { it.id == selectedTargetIdForActions }
+    val selectedTargetForActions = remember(selectedTargetIdForActions, targets.itemCount) {
+        if (selectedTargetIdForActions == null) null
+        else {
+            var found: TargetLite? = null
+            for (i in 0 until targets.itemCount) {
+                val t = targets.peek(i)
+                if (t?.id == selectedTargetIdForActions) {
+                    found = t
+                    break
+                }
+            }
+            found
+        }
+    }
     val sheetState = rememberModalBottomSheetState()
     
     Column(modifier = Modifier.fillMaxSize()) {
@@ -131,7 +147,7 @@ fun TargetListScreen(
             )
         }
 
-        if (targets.isEmpty()) {
+        if (targets.itemCount == 0 && targets.loadState.refresh is LoadState.NotLoading) {
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -144,12 +160,26 @@ fun TargetListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(targets, key = { it.id }) { target ->
-                    TargetItem(
-                        target = target, 
-                        onClick = { onTargetClick(target.id) },
-                        onLongClick = { selectedTargetIdForActions = target.id }
-                    )
+                items(
+                    count = targets.itemCount,
+                    key = targets.itemKey { it.id }
+                ) { index ->
+                    val target: TargetLite? = targets[index]
+                    if (target != null) {
+                        TargetItem(
+                            target = target, 
+                            onClick = { onTargetClick(target.id) },
+                            onLongClick = { selectedTargetIdForActions = target.id }
+                        )
+                    }
+                }
+                
+                if (targets.loadState.append is LoadState.Loading) {
+                    item {
+                        CircularProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                        )
+                    }
                 }
             }
         }

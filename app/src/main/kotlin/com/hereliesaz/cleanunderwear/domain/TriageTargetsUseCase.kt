@@ -25,66 +25,71 @@ class TriageTargetsUseCase @Inject constructor(
     data class TriageResult(val ready: Int, val needsEnrichment: Int, val ignored: Int)
 
     suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }): TriageResult = coroutineScope {
-        val all = repository.getAllTargetsLiteSnapshot()
-        if (all.isEmpty()) {
-            onProgress(1f, "No targets to triage")
-            return@coroutineScope TriageResult(0, 0, 0)
-        }
-        
-        // 1. Calculate new states in parallel across all CPU cores
-        val results = withContext(Dispatchers.Default) {
-            all.map { target ->
-                async {
-                    if (target.status == TargetStatus.IGNORED) {
-                        target.id to null // Skip archived
-                    } else {
-                        target.id to decide(target)
-                    }
-                }
-            }.awaitAll()
-        }
-
-        val toReady = mutableListOf<Int>()
-        val toNeedsEnrichment = mutableListOf<Int>()
-        val toEnrichmentFailed = mutableListOf<Int>()
-        
         var readyCount = 0
         var needsEnrichmentCount = 0
         var ignoredCount = 0
-
-        // 2. Aggregate results and identify needed changes
-        results.forEach { (id, newState) ->
-            val original = all.find { it.id == id } ?: return@forEach
+        
+        var offset = 0
+        val chunkSize = 1000
+        
+        while (true) {
+            val chunk = repository.getTargetsPaged(chunkSize, offset)
+            if (chunk.isEmpty()) break
             
-            if (newState == null) {
-                ignoredCount++
-            } else {
-                if (newState != original.monitorabilityState) {
-                    when (newState) {
-                        MonitorabilityState.READY -> toReady.add(id)
-                        MonitorabilityState.NEEDS_ENRICHMENT -> toNeedsEnrichment.add(id)
-                        MonitorabilityState.ENRICHMENT_FAILED -> toEnrichmentFailed.add(id)
+            val totalProcessed = offset + chunk.size
+            onProgress(0.1f, "Triaging contacts ($totalProcessed)...")
+
+            // 1. Calculate new states in parallel for this chunk
+            val results = withContext(Dispatchers.Default) {
+                chunk.map { target ->
+                    async {
+                        if (target.status == TargetStatus.IGNORED) {
+                            target.id to null // Skip archived
+                        } else {
+                            target.id to decide(target)
+                        }
                     }
-                }
-                
-                if (newState == MonitorabilityState.READY) readyCount++ else needsEnrichmentCount++
+                }.awaitAll()
             }
+
+            val toReady = mutableListOf<Int>()
+            val toNeedsEnrichment = mutableListOf<Int>()
+            val toEnrichmentFailed = mutableListOf<Int>()
+
+            // 2. Aggregate results
+            results.forEach { (id, newState) ->
+                val original = chunk.find { it.id == id } ?: return@forEach
+                
+                if (newState == null) {
+                    ignoredCount++
+                } else {
+                    if (newState != original.monitorabilityState) {
+                        when (newState) {
+                            MonitorabilityState.READY -> toReady.add(id)
+                            MonitorabilityState.NEEDS_ENRICHMENT -> toNeedsEnrichment.add(id)
+                            MonitorabilityState.ENRICHMENT_FAILED -> toEnrichmentFailed.add(id)
+                        }
+                    }
+                    
+                    if (newState == MonitorabilityState.READY) readyCount++ else needsEnrichmentCount++
+                }
+            }
+
+            // 3. Perform high-speed batch updates for this chunk
+            if (toReady.isNotEmpty()) {
+                repository.updateMonitorabilityStateBatch(toReady, MonitorabilityState.READY)
+            }
+            if (toNeedsEnrichment.isNotEmpty()) {
+                repository.updateMonitorabilityStateBatch(toNeedsEnrichment, MonitorabilityState.NEEDS_ENRICHMENT)
+            }
+            if (toEnrichmentFailed.isNotEmpty()) {
+                repository.updateMonitorabilityStateBatch(toEnrichmentFailed, MonitorabilityState.ENRICHMENT_FAILED)
+            }
+
+            offset += chunkSize
         }
 
-        // 3. Perform high-speed batch updates
-        if (toReady.isNotEmpty()) {
-            onProgress(0.9f, "Committing ${toReady.size} ready targets...")
-            repository.updateMonitorabilityStateBatch(toReady, MonitorabilityState.READY)
-        }
-        if (toNeedsEnrichment.isNotEmpty()) {
-            onProgress(0.95f, "Queuing ${toNeedsEnrichment.size} for enrichment...")
-            repository.updateMonitorabilityStateBatch(toNeedsEnrichment, MonitorabilityState.NEEDS_ENRICHMENT)
-        }
-        if (toEnrichmentFailed.isNotEmpty()) {
-            repository.updateMonitorabilityStateBatch(toEnrichmentFailed, MonitorabilityState.ENRICHMENT_FAILED)
-        }
-
-        DiagnosticLogger.log("Triage (Parallel): $readyCount ready, $needsEnrichmentCount need enrichment, $ignoredCount archived")
+        DiagnosticLogger.log("Triage (Chunked): $readyCount ready, $needsEnrichmentCount need enrichment, $ignoredCount archived")
         onProgress(1f, "Triage complete.")
         TriageResult(readyCount, needsEnrichmentCount, ignoredCount)
     }

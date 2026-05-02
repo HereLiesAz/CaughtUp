@@ -53,6 +53,12 @@ enum class TargetStatus {
 /**
  * Lightweight projection of [Target] used by the list UI.
  */
+/**
+ * Lightweight projection of [Target] used by the list UI.
+ *
+ * This is kept as small as possible to handle registries with 8000+ contacts without 
+ * hitting Android's 2MB CursorWindow limit. Extra details for the menu are loaded on-demand.
+ */
 data class TargetLite(
     @ColumnInfo(name = "id")
     val id: Int,
@@ -66,16 +72,27 @@ data class TargetLite(
     val status: TargetStatus,
     @ColumnInfo(name = "email")
     val email: String?,
-    @ColumnInfo(name = "residence_info")
-    val residenceInfo: String?,
-    @ColumnInfo(name = "source_account")
-    val sourceAccount: String?,
-    @ColumnInfo(name = "monitorability_state")
-    val monitorabilityState: MonitorabilityState,
+    @ColumnInfo(name = "last_status_change_timestamp")
+    val lastStatusChangeTimestamp: Long,
     @ColumnInfo(name = "last_scraped_timestamp")
-    val lastScrapedTimestamp: Long,
-    @ColumnInfo(name = "check_frequency_hours")
-    val checkFrequencyHours: Int
+    val lastScrapedTimestamp: Long
+)
+
+/**
+ * Used for background management tasks (Triage/Dedup) where we need more metadata 
+ * than the UI, but still want to avoid heavy verification snippet blobs.
+ */
+data class TargetWorkInfo(
+    @ColumnInfo(name = "id") val id: Int,
+    @ColumnInfo(name = "display_name") val displayName: String,
+    @ColumnInfo(name = "phone_number") val phoneNumber: String?,
+    @ColumnInfo(name = "email") val email: String?,
+    @ColumnInfo(name = "area_code") val areaCode: String?,
+    @ColumnInfo(name = "status") val status: TargetStatus,
+    @ColumnInfo(name = "residence_info") val residenceInfo: String?,
+    @ColumnInfo(name = "source_account") val sourceAccount: String?,
+    @ColumnInfo(name = "monitorability_state") val monitorabilityState: MonitorabilityState,
+    @ColumnInfo(name = "last_scraped_timestamp") val lastScrapedTimestamp: Long
 )
 
 /**

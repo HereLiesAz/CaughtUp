@@ -20,6 +20,10 @@ import com.hereliesaz.cleanunderwear.domain.HarvestContactsUseCase
 import com.hereliesaz.cleanunderwear.domain.TriageTargetsUseCase
 import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -120,7 +124,7 @@ class MainViewModel @Inject constructor(
     val operationState: StateFlow<OperationState> = _operationState
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val targets: StateFlow<List<TargetLite>> = combine(
+    val targets: Flow<PagingData<TargetLite>> = combine(
         _searchQuery, _sortOrder, _showIgnored,
         _showNamelessFilter, _showEmailOnlyFilter, _hasEmailFilter, _hasAddressFilter,
         _googleFilter, _metaFilter, _appleFilter, _deviceFilter,
@@ -128,25 +132,26 @@ class MainViewModel @Inject constructor(
     ) { args: Array<Any?> ->
         args
     }.flatMapLatest { args ->
-        repository.searchTargets(
-            query = args[0] as String,
-            sort = (args[1] as SortOrder).name,
-            showIgnored = args[2] as Boolean,
-            namelessF = args[3] as Boolean?,
-            emailOnlyF = args[4] as Boolean?,
-            hasEmailF = args[5] as Boolean?,
-            hasAddressF = args[6] as Boolean?,
-            googleF = args[7] as Boolean?,
-            metaF = args[8] as Boolean?,
-            appleF = args[9] as Boolean?,
-            deviceF = args[10] as Boolean?,
-            pendingEnrichF = args[11] as Boolean?
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+        Pager(
+            config = PagingConfig(pageSize = 50, enablePlaceholders = true),
+            pagingSourceFactory = {
+                repository.searchTargets(
+                    query = args[0] as String,
+                    sort = (args[1] as SortOrder).name,
+                    showIgnored = args[2] as Boolean,
+                    namelessF = args[3] as Boolean?,
+                    emailOnlyF = args[4] as Boolean?,
+                    hasEmailF = args[5] as Boolean?,
+                    hasAddressF = args[6] as Boolean?,
+                    googleF = args[7] as Boolean?,
+                    metaF = args[8] as Boolean?,
+                    appleF = args[9] as Boolean?,
+                    deviceF = args[10] as Boolean?,
+                    pendingEnrichF = args[11] as Boolean?
+                )
+            }
+        ).flow
+    }.cachedIn(viewModelScope)
 
     fun updateTarget(target: Target) {
         viewModelScope.launch {

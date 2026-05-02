@@ -1,5 +1,6 @@
 package com.hereliesaz.cleanunderwear.data
 
+import androidx.paging.PagingSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -24,8 +25,9 @@ interface TargetRepository {
         hasAddressF: Boolean?,
         pendingEnrichF: Boolean?,
         sort: String
-    ): Flow<List<TargetLite>>
-    suspend fun getAllTargetsLiteSnapshot(): List<TargetLite>
+    ): PagingSource<Int, TargetLite>
+
+    suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite>
     suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo>
 
     // Bounded full-row reads.
@@ -70,14 +72,14 @@ class OfflineTargetRepository(private val targetDao: TargetDao) : TargetReposito
         hasAddressF: Boolean?,
         pendingEnrichF: Boolean?,
         sort: String
-    ): Flow<List<TargetLite>> = targetDao.searchTargets(
+    ): PagingSource<Int, TargetLite> = targetDao.searchTargets(
         query, showIgnored, googleF, metaF, appleF, deviceF,
         namelessF, emailOnlyF, hasEmailF, hasAddressF,
         pendingEnrichF, sort
     )
 
-    override suspend fun getAllTargetsLiteSnapshot(): List<TargetLite> =
-        withContext(Dispatchers.IO) { targetDao.getAllTargetsLiteSnapshot() }
+    override suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite> =
+        withContext(Dispatchers.IO) { targetDao.getTargetsPaged(limit, offset) }
 
     override suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo> =
         withContext(Dispatchers.IO) { targetDao.getAllTargetSourceInfo() }
