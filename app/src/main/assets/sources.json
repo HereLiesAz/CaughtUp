@@ -1,0 +1,858 @@
+{
+  "version": 2,
+  "_comment": "Geographic routing is most-specific-first: county → state → multi-state. Initial coverage covers the top ~15 US metros at the county level; non-metro contacts fall through to state-level. Source kinds: QUERY_TEMPLATE (per-name URL), ROSTER_PAGE (static, used only with strict name match), MANUAL_LANDING (user-only, never automated evidence). When in doubt about a URL pattern, ship as MANUAL_LANDING so the auto scraper never produces false confidence.",
+
+  "area_codes": {
+    "205": "AL", "251": "AL", "256": "AL", "334": "AL", "659": "AL", "938": "AL",
+    "907": "AK",
+    "480": "AZ", "520": "AZ", "602": "AZ", "623": "AZ", "928": "AZ",
+    "327": "AR", "479": "AR", "501": "AR", "870": "AR",
+    "209": "CA", "213": "CA", "279": "CA", "310": "CA", "323": "CA", "341": "CA",
+    "350": "CA", "408": "CA", "415": "CA", "424": "CA", "442": "CA", "510": "CA",
+    "530": "CA", "559": "CA", "562": "CA", "619": "CA", "626": "CA", "628": "CA",
+    "650": "CA", "657": "CA", "661": "CA", "669": "CA", "707": "CA", "714": "CA",
+    "747": "CA", "760": "CA", "805": "CA", "818": "CA", "820": "CA", "831": "CA",
+    "837": "CA", "840": "CA", "858": "CA", "909": "CA", "916": "CA", "925": "CA",
+    "949": "CA", "951": "CA",
+    "303": "CO", "719": "CO", "720": "CO", "970": "CO", "983": "CO",
+    "203": "CT", "475": "CT", "860": "CT", "959": "CT",
+    "302": "DE",
+    "202": "DC", "771": "DC",
+    "239": "FL", "305": "FL", "321": "FL", "324": "FL", "352": "FL", "386": "FL",
+    "407": "FL", "448": "FL", "561": "FL", "645": "FL", "656": "FL", "689": "FL",
+    "727": "FL", "754": "FL", "772": "FL", "786": "FL", "813": "FL", "850": "FL",
+    "863": "FL", "904": "FL", "941": "FL", "954": "FL",
+    "229": "GA", "404": "GA", "470": "GA", "478": "GA", "678": "GA", "706": "GA",
+    "762": "GA", "770": "GA", "912": "GA", "943": "GA",
+    "808": "HI",
+    "208": "ID", "986": "ID",
+    "217": "IL", "224": "IL", "309": "IL", "312": "IL", "331": "IL", "447": "IL",
+    "464": "IL", "618": "IL", "630": "IL", "708": "IL", "730": "IL", "773": "IL",
+    "779": "IL", "815": "IL", "847": "IL", "861": "IL", "872": "IL",
+    "219": "IN", "260": "IN", "317": "IN", "463": "IN", "574": "IN", "765": "IN",
+    "812": "IN", "930": "IN",
+    "319": "IA", "515": "IA", "563": "IA", "641": "IA", "712": "IA",
+    "316": "KS", "620": "KS", "785": "KS", "913": "KS", "975": "KS",
+    "270": "KY", "364": "KY", "502": "KY", "606": "KY", "859": "KY",
+    "225": "LA", "318": "LA", "337": "LA", "504": "LA", "985": "LA",
+    "207": "ME",
+    "227": "MD", "240": "MD", "301": "MD", "410": "MD", "443": "MD", "667": "MD",
+    "339": "MA", "351": "MA", "413": "MA", "508": "MA", "617": "MA", "774": "MA",
+    "781": "MA", "857": "MA", "978": "MA",
+    "231": "MI", "248": "MI", "269": "MI", "313": "MI", "517": "MI", "586": "MI",
+    "616": "MI", "679": "MI", "734": "MI", "810": "MI", "906": "MI", "947": "MI",
+    "989": "MI",
+    "218": "MN", "320": "MN", "507": "MN", "612": "MN", "651": "MN", "763": "MN",
+    "924": "MN", "952": "MN",
+    "228": "MS", "471": "MS", "601": "MS", "662": "MS", "769": "MS",
+    "235": "MO", "314": "MO", "417": "MO", "557": "MO", "573": "MO", "636": "MO",
+    "660": "MO", "816": "MO",
+    "406": "MT",
+    "308": "NE", "402": "NE", "531": "NE",
+    "702": "NV", "725": "NV", "775": "NV",
+    "603": "NH",
+    "201": "NJ", "551": "NJ", "609": "NJ", "640": "NJ", "732": "NJ", "848": "NJ",
+    "856": "NJ", "862": "NJ", "908": "NJ", "973": "NJ",
+    "505": "NM", "575": "NM",
+    "212": "NY", "315": "NY", "329": "NY", "332": "NY", "347": "NY", "363": "NY",
+    "516": "NY", "518": "NY", "585": "NY", "607": "NY", "631": "NY", "646": "NY",
+    "680": "NY", "716": "NY", "718": "NY", "838": "NY", "845": "NY", "914": "NY",
+    "917": "NY", "929": "NY", "934": "NY",
+    "252": "NC", "336": "NC", "472": "NC", "704": "NC", "743": "NC", "828": "NC",
+    "910": "NC", "919": "NC", "980": "NC", "984": "NC",
+    "701": "ND",
+    "216": "OH", "220": "OH", "234": "OH", "283": "OH", "326": "OH", "330": "OH",
+    "380": "OH", "419": "OH", "436": "OH", "440": "OH", "513": "OH", "567": "OH",
+    "614": "OH", "740": "OH", "937": "OH",
+    "405": "OK", "539": "OK", "572": "OK", "580": "OK", "918": "OK",
+    "458": "OR", "503": "OR", "541": "OR", "971": "OR",
+    "215": "PA", "223": "PA", "267": "PA", "272": "PA", "412": "PA", "445": "PA",
+    "484": "PA", "570": "PA", "582": "PA", "610": "PA", "717": "PA", "724": "PA",
+    "814": "PA", "835": "PA", "878": "PA",
+    "401": "RI",
+    "803": "SC", "821": "SC", "839": "SC", "843": "SC", "854": "SC", "864": "SC",
+    "605": "SD",
+    "423": "TN", "615": "TN", "629": "TN", "731": "TN", "865": "TN", "901": "TN",
+    "931": "TN",
+    "210": "TX", "214": "TX", "254": "TX", "281": "TX", "325": "TX", "346": "TX",
+    "361": "TX", "409": "TX", "430": "TX", "432": "TX", "469": "TX", "512": "TX",
+    "682": "TX", "713": "TX", "726": "TX", "737": "TX", "806": "TX", "817": "TX",
+    "830": "TX", "832": "TX", "903": "TX", "915": "TX", "936": "TX", "940": "TX",
+    "945": "TX", "956": "TX", "972": "TX", "979": "TX",
+    "385": "UT", "435": "UT", "801": "UT", "855": "UT",
+    "802": "VT",
+    "276": "VA", "434": "VA", "540": "VA", "571": "VA", "686": "VA", "703": "VA",
+    "757": "VA", "804": "VA", "826": "VA", "948": "VA",
+    "206": "WA", "253": "WA", "360": "WA", "425": "WA", "509": "WA", "564": "WA",
+    "304": "WV", "681": "WV",
+    "262": "WI", "274": "WI", "414": "WI", "534": "WI", "608": "WI", "715": "WI",
+    "920": "WI",
+    "307": "WY",
+    "787": "PR", "939": "PR",
+    "340": "VI",
+    "671": "GU",
+    "684": "AS",
+    "670": "MP",
+    "403": "AB", "587": "AB", "780": "AB", "825": "AB", "368": "AB",
+    "236": "BC", "250": "BC", "257": "BC", "604": "BC", "672": "BC", "778": "BC",
+    "204": "MB", "431": "MB", "584": "MB",
+    "506": "NB",
+    "709": "NL",
+    "782": "NS", "902": "NS",
+    "226": "ON", "249": "ON", "289": "ON", "343": "ON", "365": "ON", "416": "ON",
+    "437": "ON", "519": "ON", "548": "ON", "613": "ON", "647": "ON", "683": "ON",
+    "705": "ON", "742": "ON", "753": "ON", "807": "ON", "905": "ON", "942": "ON",
+    "263": "QC", "354": "QC", "367": "QC", "418": "QC", "438": "QC", "450": "QC",
+    "468": "QC", "514": "QC", "579": "QC", "581": "QC", "819": "QC", "873": "QC",
+    "306": "SK", "474": "SK", "639": "SK",
+    "867": "YT"
+  },
+
+  "area_code_metros": {
+    "212": { "primary_county": "New York County, NY", "primary_city": "New York" },
+    "332": { "primary_county": "New York County, NY", "primary_city": "New York" },
+    "646": { "primary_county": "New York County, NY", "primary_city": "New York" },
+    "917": { "primary_county": "New York County, NY", "primary_city": "New York" },
+    "718": { "primary_county": "Kings County, NY", "primary_city": "Brooklyn" },
+    "347": { "primary_county": "Kings County, NY", "primary_city": "Brooklyn" },
+    "929": { "primary_county": "Kings County, NY", "primary_city": "Brooklyn" },
+    "213": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "323": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "310": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "424": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "818": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "747": { "primary_county": "Los Angeles County, CA", "primary_city": "Los Angeles" },
+    "626": { "primary_county": "Los Angeles County, CA", "primary_city": "Pasadena" },
+    "562": { "primary_county": "Los Angeles County, CA", "primary_city": "Long Beach" },
+    "312": { "primary_county": "Cook County, IL", "primary_city": "Chicago" },
+    "773": { "primary_county": "Cook County, IL", "primary_city": "Chicago" },
+    "872": { "primary_county": "Cook County, IL", "primary_city": "Chicago" },
+    "713": { "primary_county": "Harris County, TX", "primary_city": "Houston" },
+    "281": { "primary_county": "Harris County, TX", "primary_city": "Houston" },
+    "832": { "primary_county": "Harris County, TX", "primary_city": "Houston" },
+    "346": { "primary_county": "Harris County, TX", "primary_city": "Houston" },
+    "480": { "primary_county": "Maricopa County, AZ", "primary_city": "Mesa" },
+    "602": { "primary_county": "Maricopa County, AZ", "primary_city": "Phoenix" },
+    "623": { "primary_county": "Maricopa County, AZ", "primary_city": "Glendale" },
+    "215": { "primary_county": "Philadelphia County, PA", "primary_city": "Philadelphia" },
+    "267": { "primary_county": "Philadelphia County, PA", "primary_city": "Philadelphia" },
+    "445": { "primary_county": "Philadelphia County, PA", "primary_city": "Philadelphia" },
+    "210": { "primary_county": "Bexar County, TX", "primary_city": "San Antonio" },
+    "726": { "primary_county": "Bexar County, TX", "primary_city": "San Antonio" },
+    "619": { "primary_county": "San Diego County, CA", "primary_city": "San Diego" },
+    "858": { "primary_county": "San Diego County, CA", "primary_city": "San Diego" },
+    "214": { "primary_county": "Dallas County, TX", "primary_city": "Dallas" },
+    "469": { "primary_county": "Dallas County, TX", "primary_city": "Dallas" },
+    "972": { "primary_county": "Dallas County, TX", "primary_city": "Dallas" },
+    "945": { "primary_county": "Dallas County, TX", "primary_city": "Dallas" },
+    "512": { "primary_county": "Travis County, TX", "primary_city": "Austin" },
+    "737": { "primary_county": "Travis County, TX", "primary_city": "Austin" },
+    "504": { "primary_county": "Orleans Parish, LA", "primary_city": "New Orleans" },
+    "415": { "primary_county": "San Francisco County, CA", "primary_city": "San Francisco" },
+    "628": { "primary_county": "San Francisco County, CA", "primary_city": "San Francisco" },
+    "206": { "primary_county": "King County, WA", "primary_city": "Seattle" },
+    "425": { "primary_county": "King County, WA", "primary_city": "Bellevue" },
+    "253": { "primary_county": "Pierce County, WA", "primary_city": "Tacoma" },
+    "202": { "primary_county": "District of Columbia", "primary_city": "Washington" },
+    "771": { "primary_county": "District of Columbia", "primary_city": "Washington" },
+    "617": { "primary_county": "Suffolk County, MA", "primary_city": "Boston" },
+    "857": { "primary_county": "Suffolk County, MA", "primary_city": "Boston" },
+    "303": { "primary_county": "Denver County, CO", "primary_city": "Denver" },
+    "720": { "primary_county": "Denver County, CO", "primary_city": "Denver" },
+    "404": { "primary_county": "Fulton County, GA", "primary_city": "Atlanta" },
+    "470": { "primary_county": "Fulton County, GA", "primary_city": "Atlanta" },
+    "678": { "primary_county": "Fulton County, GA", "primary_city": "Atlanta" },
+    "313": { "primary_county": "Wayne County, MI", "primary_city": "Detroit" },
+    "305": { "primary_county": "Miami-Dade County, FL", "primary_city": "Miami" },
+    "786": { "primary_county": "Miami-Dade County, FL", "primary_city": "Miami" },
+    "702": { "primary_county": "Clark County, NV", "primary_city": "Las Vegas" },
+    "725": { "primary_county": "Clark County, NV", "primary_city": "Las Vegas" }
+  },
+
+  "zip_to_county": {
+    "70112": "Orleans Parish, LA",
+    "70113": "Orleans Parish, LA",
+    "70115": "Orleans Parish, LA",
+    "70116": "Orleans Parish, LA",
+    "70117": "Orleans Parish, LA",
+    "70118": "Orleans Parish, LA",
+    "70119": "Orleans Parish, LA",
+    "70122": "Orleans Parish, LA",
+    "70124": "Orleans Parish, LA",
+    "70125": "Orleans Parish, LA",
+    "70126": "Orleans Parish, LA",
+    "70127": "Orleans Parish, LA",
+    "70128": "Orleans Parish, LA",
+    "70129": "Orleans Parish, LA",
+    "70130": "Orleans Parish, LA",
+    "70131": "Orleans Parish, LA",
+    "10001": "New York County, NY",
+    "10002": "New York County, NY",
+    "10003": "New York County, NY",
+    "10009": "New York County, NY",
+    "10010": "New York County, NY",
+    "10011": "New York County, NY",
+    "10012": "New York County, NY",
+    "10013": "New York County, NY",
+    "10014": "New York County, NY",
+    "10016": "New York County, NY",
+    "10017": "New York County, NY",
+    "10018": "New York County, NY",
+    "10019": "New York County, NY",
+    "10025": "New York County, NY",
+    "10027": "New York County, NY",
+    "10128": "New York County, NY",
+    "11201": "Kings County, NY",
+    "11211": "Kings County, NY",
+    "11215": "Kings County, NY",
+    "11217": "Kings County, NY",
+    "11220": "Kings County, NY",
+    "11226": "Kings County, NY",
+    "11231": "Kings County, NY",
+    "11238": "Kings County, NY",
+    "90001": "Los Angeles County, CA",
+    "90002": "Los Angeles County, CA",
+    "90011": "Los Angeles County, CA",
+    "90012": "Los Angeles County, CA",
+    "90013": "Los Angeles County, CA",
+    "90015": "Los Angeles County, CA",
+    "90017": "Los Angeles County, CA",
+    "90019": "Los Angeles County, CA",
+    "90026": "Los Angeles County, CA",
+    "90028": "Los Angeles County, CA",
+    "90031": "Los Angeles County, CA",
+    "90034": "Los Angeles County, CA",
+    "90046": "Los Angeles County, CA",
+    "90048": "Los Angeles County, CA",
+    "90069": "Los Angeles County, CA",
+    "90210": "Los Angeles County, CA",
+    "60601": "Cook County, IL",
+    "60602": "Cook County, IL",
+    "60603": "Cook County, IL",
+    "60604": "Cook County, IL",
+    "60605": "Cook County, IL",
+    "60606": "Cook County, IL",
+    "60607": "Cook County, IL",
+    "60608": "Cook County, IL",
+    "60609": "Cook County, IL",
+    "60610": "Cook County, IL",
+    "60611": "Cook County, IL",
+    "60612": "Cook County, IL",
+    "60613": "Cook County, IL",
+    "60614": "Cook County, IL",
+    "60615": "Cook County, IL",
+    "60616": "Cook County, IL",
+    "77001": "Harris County, TX",
+    "77002": "Harris County, TX",
+    "77003": "Harris County, TX",
+    "77004": "Harris County, TX",
+    "77005": "Harris County, TX",
+    "77006": "Harris County, TX",
+    "77007": "Harris County, TX",
+    "77008": "Harris County, TX",
+    "77019": "Harris County, TX",
+    "77024": "Harris County, TX",
+    "77025": "Harris County, TX",
+    "77027": "Harris County, TX",
+    "85001": "Maricopa County, AZ",
+    "85003": "Maricopa County, AZ",
+    "85004": "Maricopa County, AZ",
+    "85006": "Maricopa County, AZ",
+    "85007": "Maricopa County, AZ",
+    "85008": "Maricopa County, AZ",
+    "85013": "Maricopa County, AZ",
+    "85014": "Maricopa County, AZ",
+    "85015": "Maricopa County, AZ",
+    "85016": "Maricopa County, AZ",
+    "19102": "Philadelphia County, PA",
+    "19103": "Philadelphia County, PA",
+    "19104": "Philadelphia County, PA",
+    "19106": "Philadelphia County, PA",
+    "19107": "Philadelphia County, PA",
+    "19121": "Philadelphia County, PA",
+    "19122": "Philadelphia County, PA",
+    "19123": "Philadelphia County, PA",
+    "78201": "Bexar County, TX",
+    "78202": "Bexar County, TX",
+    "78203": "Bexar County, TX",
+    "78204": "Bexar County, TX",
+    "78205": "Bexar County, TX",
+    "78207": "Bexar County, TX",
+    "78212": "Bexar County, TX",
+    "78215": "Bexar County, TX",
+    "92101": "San Diego County, CA",
+    "92102": "San Diego County, CA",
+    "92103": "San Diego County, CA",
+    "92104": "San Diego County, CA",
+    "92105": "San Diego County, CA",
+    "92107": "San Diego County, CA",
+    "92113": "San Diego County, CA",
+    "92114": "San Diego County, CA",
+    "75201": "Dallas County, TX",
+    "75202": "Dallas County, TX",
+    "75203": "Dallas County, TX",
+    "75204": "Dallas County, TX",
+    "75205": "Dallas County, TX",
+    "75206": "Dallas County, TX",
+    "75215": "Dallas County, TX",
+    "75216": "Dallas County, TX",
+    "78701": "Travis County, TX",
+    "78702": "Travis County, TX",
+    "78703": "Travis County, TX",
+    "78704": "Travis County, TX",
+    "78705": "Travis County, TX",
+    "78712": "Travis County, TX",
+    "78721": "Travis County, TX",
+    "78722": "Travis County, TX",
+    "94102": "San Francisco County, CA",
+    "94103": "San Francisco County, CA",
+    "94104": "San Francisco County, CA",
+    "94107": "San Francisco County, CA",
+    "94108": "San Francisco County, CA",
+    "94109": "San Francisco County, CA",
+    "94110": "San Francisco County, CA",
+    "94114": "San Francisco County, CA",
+    "98101": "King County, WA",
+    "98102": "King County, WA",
+    "98103": "King County, WA",
+    "98104": "King County, WA",
+    "98105": "King County, WA",
+    "98109": "King County, WA",
+    "98112": "King County, WA",
+    "98119": "King County, WA",
+    "20001": "District of Columbia",
+    "20002": "District of Columbia",
+    "20003": "District of Columbia",
+    "20009": "District of Columbia",
+    "20010": "District of Columbia",
+    "20011": "District of Columbia",
+    "20016": "District of Columbia",
+    "20017": "District of Columbia",
+    "02108": "Suffolk County, MA",
+    "02109": "Suffolk County, MA",
+    "02110": "Suffolk County, MA",
+    "02111": "Suffolk County, MA",
+    "02114": "Suffolk County, MA",
+    "02115": "Suffolk County, MA",
+    "02116": "Suffolk County, MA",
+    "02118": "Suffolk County, MA",
+    "80202": "Denver County, CO",
+    "80203": "Denver County, CO",
+    "80204": "Denver County, CO",
+    "80205": "Denver County, CO",
+    "80206": "Denver County, CO",
+    "80207": "Denver County, CO",
+    "80218": "Denver County, CO",
+    "80220": "Denver County, CO",
+    "30303": "Fulton County, GA",
+    "30308": "Fulton County, GA",
+    "30309": "Fulton County, GA",
+    "30312": "Fulton County, GA",
+    "30313": "Fulton County, GA",
+    "30314": "Fulton County, GA",
+    "30318": "Fulton County, GA",
+    "30324": "Fulton County, GA",
+    "48201": "Wayne County, MI",
+    "48202": "Wayne County, MI",
+    "48207": "Wayne County, MI",
+    "48208": "Wayne County, MI",
+    "48214": "Wayne County, MI",
+    "48215": "Wayne County, MI",
+    "48216": "Wayne County, MI",
+    "33101": "Miami-Dade County, FL",
+    "33125": "Miami-Dade County, FL",
+    "33127": "Miami-Dade County, FL",
+    "33128": "Miami-Dade County, FL",
+    "33129": "Miami-Dade County, FL",
+    "33130": "Miami-Dade County, FL",
+    "33133": "Miami-Dade County, FL",
+    "33135": "Miami-Dade County, FL",
+    "89101": "Clark County, NV",
+    "89102": "Clark County, NV",
+    "89104": "Clark County, NV",
+    "89106": "Clark County, NV",
+    "89107": "Clark County, NV",
+    "89109": "Clark County, NV",
+    "89119": "Clark County, NV",
+    "89121": "Clark County, NV"
+  },
+
+  "counties": {
+    "Orleans Parish, LA": {
+      "state": "LA",
+      "lockup_sources": [
+        {
+          "id": "opso_orleans",
+          "label": "Orleans Parish Sheriff Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://opso.us/inmate-search/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "New York County, NY": {
+      "state": "NY",
+      "lockup_sources": [
+        {
+          "id": "nyc_doc_inmate_lookup",
+          "label": "NYC Department of Correction Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://a073-ils-web.nyc.gov/inmatelookup/pages/common/find.jsf",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Kings County, NY": {
+      "state": "NY",
+      "lockup_sources": [
+        {
+          "id": "nyc_doc_inmate_lookup_kings",
+          "label": "NYC Department of Correction Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://a073-ils-web.nyc.gov/inmatelookup/pages/common/find.jsf",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Los Angeles County, CA": {
+      "state": "CA",
+      "lockup_sources": [
+        {
+          "id": "lasd_inmate_info_center",
+          "label": "LASD Inmate Information Center",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://app4.lasd.org/iic/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Cook County, IL": {
+      "state": "IL",
+      "lockup_sources": [
+        {
+          "id": "cook_county_sheriff_inmate_locator",
+          "label": "Cook County Sheriff Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.cookcountysheriff.org/inmate-locator/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Harris County, TX": {
+      "state": "TX",
+      "lockup_sources": [
+        {
+          "id": "harris_county_jil",
+          "label": "Harris County Sheriff Inmate Lookup (JIL)",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://harriscountyso.org/JIL/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Maricopa County, AZ": {
+      "state": "AZ",
+      "lockup_sources": [
+        {
+          "id": "mcso_inmate_locator",
+          "label": "Maricopa County Sheriff Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.mcso.org/i-want-to/locate-an-inmate",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Philadelphia County, PA": {
+      "state": "PA",
+      "lockup_sources": [
+        {
+          "id": "phila_dop_inmate",
+          "label": "Philadelphia Department of Prisons Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.phila.gov/departments/philadelphia-department-of-prisons/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Bexar County, TX": {
+      "state": "TX",
+      "lockup_sources": [
+        {
+          "id": "bexar_magistrate_search",
+          "label": "Bexar County Magistrate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.bexar.org/3168/Magistrate-Search",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "San Diego County, CA": {
+      "state": "CA",
+      "lockup_sources": [
+        {
+          "id": "sdsheriff_who_is_in_jail",
+          "label": "San Diego Sheriff — Who's In Jail",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.sdsheriff.gov/resources/inmate-information/whos-in-jail",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Dallas County, TX": {
+      "state": "TX",
+      "lockup_sources": [
+        {
+          "id": "dallas_sheriff_inmate",
+          "label": "Dallas County Sheriff Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.dallassheriff.net/inmate-information/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Travis County, TX": {
+      "state": "TX",
+      "lockup_sources": [
+        {
+          "id": "travis_sheriff_jail_records",
+          "label": "Travis County Sheriff Jail Records",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.tcsheriff.org/jail-records",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "San Francisco County, CA": {
+      "state": "CA",
+      "lockup_sources": [
+        {
+          "id": "sfsheriff_in_custody",
+          "label": "San Francisco Sheriff In-Custody Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.sfsheriff.com/services/in-custody-information",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "King County, WA": {
+      "state": "WA",
+      "lockup_sources": [
+        {
+          "id": "king_county_inmate_lookup",
+          "label": "King County Jail Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://kingcounty.gov/depts/jail-and-courts/jail-inmate-lookup.aspx",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Pierce County, WA": {
+      "state": "WA",
+      "lockup_sources": [],
+      "obituary_sources": []
+    },
+    "District of Columbia": {
+      "state": "DC",
+      "lockup_sources": [
+        {
+          "id": "dc_doc_inmate_locator",
+          "label": "DC Department of Corrections Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://doc.dc.gov/page/inmate-locator",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Suffolk County, MA": {
+      "state": "MA",
+      "lockup_sources": [
+        {
+          "id": "suffolk_sheriff_inmate",
+          "label": "Suffolk County Sheriff Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.scsdma.org/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Denver County, CO": {
+      "state": "CO",
+      "lockup_sources": [
+        {
+          "id": "denver_sheriff_inmate",
+          "label": "Denver Sheriff Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Denver-Sheriff-Department",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Fulton County, GA": {
+      "state": "GA",
+      "lockup_sources": [
+        {
+          "id": "fulton_sheriff_inmate",
+          "label": "Fulton County Sheriff Jail Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://app.fultonsheriff.org/InmateInquiry/",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Wayne County, MI": {
+      "state": "MI",
+      "lockup_sources": [
+        {
+          "id": "wayne_sheriff_inmate",
+          "label": "Wayne County Sheriff Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.waynecounty.com/elected/sheriff/inmate-search.aspx",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Miami-Dade County, FL": {
+      "state": "FL",
+      "lockup_sources": [
+        {
+          "id": "miami_dade_inmate_lookup",
+          "label": "Miami-Dade Corrections Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.miamidade.gov/global/corrections/inmate-search.page",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "Clark County, NV": {
+      "state": "NV",
+      "lockup_sources": [
+        {
+          "id": "lvmpd_inmate",
+          "label": "Las Vegas Metro Police Inmate Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://www.lvmpd.com/en-us/Pages/InmateSearch.aspx",
+          "render": "WEBVIEW",
+          "scope": "COUNTY"
+        }
+      ],
+      "obituary_sources": []
+    }
+  },
+
+  "states": {
+    "AL": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "AK": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "AZ": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "AR": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "CA": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "cdcr_locator",
+          "label": "CDCR Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://inmatelocator.cdcr.ca.gov/",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "CO": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "CT": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "DE": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "DC": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "FL": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "fdc_offender_search",
+          "label": "Florida DOC Offender Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://pubapps.fdc.myflorida.com/OffenderSearch/InmateInfoMenu.aspx",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "GA": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "HI": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "ID": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "IL": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "IN": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "IA": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "KS": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "KY": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "LA": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "la_doc_locator",
+          "label": "Louisiana DOC Imprisoned Persons Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://doc.la.gov/imprisoned-persons-locator/",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "ME": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MD": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MA": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MI": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MN": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MS": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MO": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MT": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NE": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NV": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NH": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NJ": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NM": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "NY": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "nysdoccs_lookup",
+          "label": "New York DOCCS Inmate Lookup",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://nysdoccslookup.doccs.ny.gov/",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "NC": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "ND": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "OH": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "OK": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "OR": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "PA": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "pa_doc_locator",
+          "label": "Pennsylvania DOC Inmate Locator",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://inmatelocator.cor.pa.gov/",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "RI": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "SC": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "SD": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "TN": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "TX": {
+      "country": "US",
+      "lockup_sources": [
+        {
+          "id": "tdcj_offender_search",
+          "label": "Texas TDCJ Offender Search",
+          "kind": "MANUAL_LANDING",
+          "url_template": "https://offender.tdcj.texas.gov/OffenderSearch/start.action",
+          "render": "WEBVIEW",
+          "scope": "STATE"
+        }
+      ],
+      "obituary_sources": []
+    },
+    "UT": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "VT": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "VA": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "WA": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "WV": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "WI": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "WY": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "PR": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "VI": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "GU": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "AS": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "MP": { "country": "US", "lockup_sources": [], "obituary_sources": [] },
+    "AB": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "BC": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "MB": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "NB": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "NL": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "NS": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "ON": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "QC": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "SK": { "country": "CA", "lockup_sources": [], "obituary_sources": [] },
+    "YT": { "country": "CA", "lockup_sources": [], "obituary_sources": [] }
+  },
+
+  "multi_state": [
+    {
+      "id": "vinelink_us",
+      "label": "VINELink (US multi-state)",
+      "kind": "MANUAL_LANDING",
+      "url_template": "https://www.vinelink.com/",
+      "render": "WEBVIEW",
+      "scope": "MULTI_STATE",
+      "covers_country": "US"
+    },
+    {
+      "id": "bop_inmate_locator",
+      "label": "Federal BOP Inmate Locator",
+      "kind": "MANUAL_LANDING",
+      "url_template": "https://www.bop.gov/inmateloc/",
+      "render": "WEBVIEW",
+      "scope": "MULTI_STATE",
+      "covers_country": "US"
+    },
+    {
+      "id": "csc_canada_offender_search",
+      "label": "Correctional Service Canada Offender Search",
+      "kind": "MANUAL_LANDING",
+      "url_template": "https://www.csc-scc.gc.ca/",
+      "render": "WEBVIEW",
+      "scope": "MULTI_STATE",
+      "covers_country": "CA"
+    }
+  ]
+}

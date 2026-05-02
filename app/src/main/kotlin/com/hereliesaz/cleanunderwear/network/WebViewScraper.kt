@@ -89,9 +89,13 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
     }
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-    suspend fun scrapeGhostTown(url: String): Document? = withContext(Dispatchers.Main) {
+    suspend fun scrapeGhostTown(
+        url: String,
+        settleMs: Int = 1500,
+        readySelector: String? = null
+    ): Document? = withContext(Dispatchers.Main) {
         DiagnosticLogger.log("Opening Covert Browser for: $url")
-        withTimeoutOrNull(30000L) { // 30 second timeout for the entire operation
+        withTimeoutOrNull(30000L) {
             suspendCancellableCoroutine { continuation ->
                 val webView = WebView(context)
                 var isResumed = false
@@ -139,18 +143,18 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                 webView.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         DiagnosticLogger.log("Covert page loaded. Analyzing content...")
-                        view?.postDelayed({
-                            try {
-                                view.evaluateJavascript(
-                                    "(function() { window.HTMLOUT.dump(document.documentElement.outerHTML); })();",
-                                    null
-                                )
-                            } catch (e: Exception) {
-                                resumeOnce(null)
+                        try {
+                            val script = if (readySelector != null) {
+                                buildPollingScript(readySelector, settleMs)
+                            } else {
+                                buildSettleScript(settleMs)
                             }
-                        }, 1000) // Reduced delay
+                            view?.evaluateJavascript(script, null)
+                        } catch (e: Exception) {
+                            resumeOnce(null)
+                        }
                     }
-                    
+
                     override fun onReceivedHttpError(
                         view: WebView?,
                         request: WebResourceRequest?,
@@ -177,4 +181,30 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
             }
         }
     }
+
+    private fun buildSettleScript(settleMs: Int): String =
+        "(function(){setTimeout(function(){window.HTMLOUT.dump(document.documentElement.outerHTML);}, $settleMs);})();"
+
+    private fun buildPollingScript(readySelector: String, settleMs: Int): String {
+        // Poll for `readySelector` every 200 ms; max wait = settleMs * 6, capped at 8 s.
+        val maxWait = (settleMs * 6).coerceAtMost(8000)
+        val sel = jsString(readySelector)
+        return """
+            (function(){
+              var sel = $sel;
+              var elapsed = 0;
+              var maxWait = $maxWait;
+              var t = setInterval(function(){
+                elapsed += 200;
+                if (document.querySelector(sel) || elapsed >= maxWait) {
+                  clearInterval(t);
+                  window.HTMLOUT.dump(document.documentElement.outerHTML);
+                }
+              }, 200);
+            })();
+        """.trimIndent()
+    }
+
+    private fun jsString(s: String): String =
+        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }

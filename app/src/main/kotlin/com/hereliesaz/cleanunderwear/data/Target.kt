@@ -44,6 +44,7 @@ data class Target(
 
 enum class TargetStatus {
     MONITORING,
+    UNVERIFIED,
     INCARCERATED,
     DECEASED,
     IGNORED,
@@ -96,8 +97,9 @@ data class TargetWorkInfo(
 )
 
 /**
- * Used by [com.hereliesaz.cleanunderwear.domain.SetupSourcesUseCase] to group targets by area
- * and check for missing intelligence URLs without loading massive verification snippets.
+ * Lightweight projection of source-related fields. Kept around for any caller
+ * that wants to inspect stored URLs in bulk without loading verification
+ * snippets.
  */
 data class TargetSourceInfo(
     @ColumnInfo(name = "id")

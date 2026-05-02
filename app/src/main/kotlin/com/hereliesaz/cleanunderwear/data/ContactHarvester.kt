@@ -1,18 +1,31 @@
 package com.hereliesaz.cleanunderwear.data
 
 import android.content.ContentResolver
+import android.content.Context
 import android.database.Cursor
 import android.provider.ContactsContract
 import android.util.Log
+import com.hereliesaz.cleanunderwear.network.SourceCatalog
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * The grim reaper's scythe for the local phonebook. 
- * Extracts the living so we can monitor them for their inevitable transition to incarcerated or deceased.
+ * Pulls contacts out of the system contact provider and projects them onto
+ * [Target] rows. URLs parsed from contact notes (`Records:` / `Obit:`) are
+ * whitelisted against [SourceCatalog] before being trusted, so legacy notes
+ * containing search-engine URLs from earlier app versions can't re-poison the
+ * registry.
  */
-class ContactHarvester(private val contentResolver: ContentResolver) {
+@Singleton
+class ContactHarvester @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val sourceCatalog: SourceCatalog
+) {
+    private val contentResolver: ContentResolver get() = context.contentResolver
 
     suspend fun harvestContacts(allowedAccountTypes: Set<String> = emptySet()): List<Target> = withContext(Dispatchers.IO) {
         val contactDataMap = mutableMapOf<Long, ContactData>()
@@ -165,6 +178,7 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
         statusMatch?.let {
             data.status = when (it.groupValues[1]) {
                 "Monitoring" -> TargetStatus.MONITORING
+                "Unverified" -> TargetStatus.UNVERIFIED
                 "Incarcerated" -> TargetStatus.INCARCERATED
                 "Deceased" -> TargetStatus.DECEASED
                 "Archived" -> TargetStatus.IGNORED
@@ -184,10 +198,24 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
         }
 
         val recordsMatch = "Records: (.*?)(\n|$)".toRegex().find(note)
-        recordsMatch?.let { data.lockupUrl = it.groupValues[1].trim() }
+        recordsMatch?.let {
+            val url = it.groupValues[1].trim()
+            if (sourceCatalog.isFromCatalog(url)) {
+                data.lockupUrl = url
+            } else if (url.isNotBlank()) {
+                DiagnosticLogger.log("Ignoring non-catalog Records URL on contact note: $url")
+            }
+        }
 
         val obitMatch = "Obit: (.*?)(\n|$)".toRegex().find(note)
-        obitMatch?.let { data.obituaryUrl = it.groupValues[1].trim() }
+        obitMatch?.let {
+            val url = it.groupValues[1].trim()
+            if (sourceCatalog.isFromCatalog(url)) {
+                data.obituaryUrl = url
+            } else if (url.isNotBlank()) {
+                DiagnosticLogger.log("Ignoring non-catalog Obit URL on contact note: $url")
+            }
+        }
     }
 
     private class ContactData(

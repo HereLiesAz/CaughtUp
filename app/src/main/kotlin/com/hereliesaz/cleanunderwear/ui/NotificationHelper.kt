@@ -40,6 +40,10 @@ class NotificationHelper @Inject constructor(@ApplicationContext private val con
     }
 
     fun notifyStatusChange(target: Target, oldStatus: TargetStatus) {
+        // UNVERIFIED is an internal queue state (name needs identity enrichment),
+        // not a user-actionable hit — never wake the user for it.
+        if (target.status == TargetStatus.UNVERIFIED) return
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }

@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * The physical manifestation of your localized surveillance state.
  */
-@Database(entities = [Target::class], version = 7, exportSchema = false)
+@Database(entities = [Target::class], version = 8, exportSchema = false)
 abstract class CleanUnderwearDatabase : RoomDatabase() {
     abstract fun targetDao(): TargetDao
 
@@ -101,6 +101,47 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Source-catalog redesign migration. Strips search-engine URLs that
+         * earlier versions persisted as "evidence", and resets any status flip
+         * those URLs caused so the contact re-confirms against a real catalog
+         * source on the next pipeline run.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val poisonedClause = listOf(
+                    "url LIKE 'https://www.google.com/search%'",
+                    "url LIKE 'https://google.com/search%'",
+                    "url LIKE 'https://duckduckgo.com/%'",
+                    "url LIKE 'https://html.duckduckgo.com/%'",
+                    "url LIKE 'https://www.bing.com/search%'",
+                    "url LIKE 'https://news.google.com/%'"
+                ).joinToString(" OR ")
+
+                database.execSQL(
+                    "UPDATE targets SET lockup_url = NULL WHERE " +
+                        poisonedClause.replace("url", "lockup_url")
+                )
+                database.execSQL(
+                    "UPDATE targets SET obituary_url = NULL WHERE " +
+                        poisonedClause.replace("url", "obituary_url")
+                )
+
+                // We can't tell which prior INCARCERATED/DECEASED rows came
+                // from real evidence vs the Google fallback. Reset everything
+                // and let the new pipeline re-confirm against curated sources.
+                database.execSQL(
+                    "UPDATE targets SET " +
+                        "status = 'MONITORING', " +
+                        "last_verification_snippet = NULL, " +
+                        "last_status_change_timestamp = 0 " +
+                    "WHERE status IN ('INCARCERATED', 'DECEASED')"
+                )
+
+                database.execSQL("UPDATE targets SET next_scheduled_check = 0")
+            }
+        }
+
         fun getDatabase(context: Context): CleanUnderwearDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -108,7 +149,10 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
                     CleanUnderwearDatabase::class.java,
                     "cleanunderwear_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                )
                 .build()
                 .also { Instance = it }
             }

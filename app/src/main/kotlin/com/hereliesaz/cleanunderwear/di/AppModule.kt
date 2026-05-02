@@ -59,9 +59,4 @@ object AppModule {
             .build()
     }
 
-    @Provides
-    @Singleton
-    fun provideContactHarvester(@ApplicationContext context: Context): com.hereliesaz.cleanunderwear.data.ContactHarvester {
-        return com.hereliesaz.cleanunderwear.data.ContactHarvester(context.contentResolver)
-    }
 }

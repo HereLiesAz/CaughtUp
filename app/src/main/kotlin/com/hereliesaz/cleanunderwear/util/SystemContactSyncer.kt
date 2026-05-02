@@ -23,17 +23,22 @@ class SystemContactSyncer @Inject constructor(@ApplicationContext private val co
 
             val statusText = when (target.status) {
                 TargetStatus.MONITORING -> "Monitoring"
+                TargetStatus.UNVERIFIED -> "Unverified"
                 TargetStatus.INCARCERATED -> "Incarcerated"
                 TargetStatus.DECEASED -> "Deceased"
                 TargetStatus.IGNORED -> "Archived"
                 TargetStatus.UNKNOWN -> "Checking..."
             }
 
+            // Status + last-check stamp only — URLs live in the app DB, not in
+            // the system contact note. Earlier versions echoed lockup_url /
+            // obituary_url here, but that round-tripped search-engine URLs
+            // back into the registry on the next harvest. The harvester now
+            // whitelists URLs via SourceCatalog as a defense; not emitting in
+            // the first place is the cleaner end of the same fix.
             val note = """
                 [Registry Status: $statusText]
                 Last Check: ${java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.US).format(java.util.Date(target.lastScrapedTimestamp))}
-                ${target.lockupUrl?.let { "Records: $it" } ?: ""}
-                ${target.obituaryUrl?.let { "Obit: $it" } ?: ""}
             """.trimIndent()
 
             upsertContactNote(context.contentResolver, contactId, note)

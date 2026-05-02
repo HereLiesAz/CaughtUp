@@ -109,7 +109,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 onClick = { viewModel.sweepContacts() }
             )
             azRailSubItem(
-                id = "interrogate",
+                id = "update",
                 hostId = "intelligence_ops",
                 text = "Update",
                 content = "Update",
@@ -238,6 +238,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                     if (current != null) {
                         TargetDetailScreen(
                             target = current,
+                            sourceCatalog = viewModel.sourceCatalog,
                             onUpdateTarget = { viewModel.updateTarget(it) },
                             onNavigateBack = { navController.popBackStack() }
                         )

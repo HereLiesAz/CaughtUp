@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 val NeonCyan = Color(0xFF00E5FF)
 val DeepSlate = Color(0xFF0D1117)
 val IntelligenceGold = Color(0xFFFFB300)
+val UnverifiedAmber = Color(0xFFFF8A40)
 val SurveillanceGrey = Color(0xFF1C1F26)
 val CircuitBlue = Color(0xFF00838F)
 val VerifiedGreen = Color(0xFF00E676)

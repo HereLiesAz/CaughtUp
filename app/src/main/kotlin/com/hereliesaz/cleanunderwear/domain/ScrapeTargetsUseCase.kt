@@ -1,39 +1,45 @@
 package com.hereliesaz.cleanunderwear.domain
 
+import com.hereliesaz.cleanunderwear.data.MonitorabilityState
 import com.hereliesaz.cleanunderwear.data.Target
-import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.data.TargetRepository
+import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.network.HtmlScraper
 import com.hereliesaz.cleanunderwear.network.IdentityVerifier
-import com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
+import com.hereliesaz.cleanunderwear.network.NameValidator
+import com.hereliesaz.cleanunderwear.network.RenderMode
+import com.hereliesaz.cleanunderwear.network.Source
+import com.hereliesaz.cleanunderwear.network.SourceCatalog
+import com.hereliesaz.cleanunderwear.network.SourceKind
+import com.hereliesaz.cleanunderwear.network.SourceUrlBuilder
 import com.hereliesaz.cleanunderwear.network.WebViewScraper
 import com.hereliesaz.cleanunderwear.ui.NotificationHelper
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import com.hereliesaz.cleanunderwear.util.SystemContactSyncer
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import javax.inject.Inject
 
 /**
- * Phase 4 of the pipeline: actually monitor the READY targets against public records.
+ * Phase 4 of the pipeline: monitor each READY target against curated sources
+ * from [SourceCatalog]. The scraper never falls back to a search engine and
+ * never writes a non-catalog URL to [Target.lockupUrl] / [Target.obituaryUrl].
  *
- * For each target there are six observable sub-steps; we emit progress + a description after
- * each one so the UI can show "47/123 · Alice Smith · checking obituary registry". The bar
- * fraction is `completedTargets / totalTargets` — sub-steps don't push the bar forward but they
- * do refresh the description.
+ * Sources are tried most-specific-first (county → state → multi-state). The
+ * first confirmed match flips the status; otherwise the contact stays in
+ * MONITORING.
  */
 class ScrapeTargetsUseCase @Inject constructor(
     private val repository: TargetRepository,
     private val basicScraper: HtmlScraper,
     private val stealthScraper: WebViewScraper,
-    private val researchAgent: OnDeviceResearchAgent,
     private val verifier: IdentityVerifier,
+    private val sourceCatalog: SourceCatalog,
     private val notifications: NotificationHelper,
     private val contactSyncer: SystemContactSyncer
 ) {
@@ -64,9 +70,7 @@ class ScrapeTargetsUseCase @Inject constructor(
             async {
                 semaphore.withPermit {
                     processTarget(target, now) { step -> emit(target.displayName, step) }
-                    completionLock.withLock {
-                        completedCount++
-                    }
+                    completionLock.withLock { completedCount++ }
                     onProgress(
                         completedCount.toFloat() / total,
                         "$completedCount/$total · ${target.displayName} · done"
@@ -84,80 +88,139 @@ class ScrapeTargetsUseCase @Inject constructor(
         emitStep: suspend (String) -> Unit
     ) {
         try {
-            var activeTarget = target
-
-            if (target.displayName == "Unnamed Entity" || target.residenceInfo.isNullOrBlank()) {
-                emitStep("enriching missing intel")
-                activeTarget = researchAgent.enrichIntelligence(target)
+            // Pre-flight: even though Triage already filters unverifiable names
+            // out of READY, defensively skip here too. No scrape, no status flip.
+            val nameResult = NameValidator.validate(target.displayName)
+            if (nameResult !is NameValidator.Result.Ok) {
+                emitStep("name not verifiable — skipping (${(nameResult as NameValidator.Result.Skip).reason})")
+                repository.updateTarget(
+                    target.copy(
+                        status = TargetStatus.UNVERIFIED,
+                        monitorabilityState = MonitorabilityState.NEEDS_ENRICHMENT,
+                        lastScrapedTimestamp = now,
+                        nextScheduledCheck = now + (target.checkFrequencyHours * 3600000L)
+                    )
+                )
+                return
             }
+            val firstName = nameResult.first
+            val lastName = nameResult.last
+
+            val lockupSources = sourceCatalog
+                .lockupSourcesFor(target.areaCode, target.residenceInfo)
+                .filter { it.kind != SourceKind.MANUAL_LANDING }
+            val obituarySources = sourceCatalog
+                .obituarySourcesFor(target.areaCode, target.residenceInfo)
+                .filter { it.kind != SourceKind.MANUAL_LANDING }
 
             var newStatus = TargetStatus.MONITORING
-            var discoveredLockupUrl = activeTarget.lockupUrl
-            var discoveredObitUrl = activeTarget.obituaryUrl
-            var verificationSnippet = activeTarget.lastVerificationSnippet
+            var discoveredLockupUrl: String? = null
+            var discoveredObitUrl: String? = null
+            var verificationSnippet: String? = null
 
-            emitStep("resolving jail roster URL")
-            val lockupUrl = activeTarget.lockupUrl
-                ?: researchAgent.getDynamicLockupUrl(activeTarget.areaCode, activeTarget.residenceInfo)
-                    .also { discoveredLockupUrl = it }
-
-            emitStep("checking jail roster")
-            DiagnosticLogger.log("Checking jail roster for ${activeTarget.displayName} at $lockupUrl")
-            val lockupResult = basicScraper.scrapeMugshots(lockupUrl, activeTarget.displayName)
-            if (lockupResult.isMatch) {
-                DiagnosticLogger.log(
-                    "MATCH FOUND: ${activeTarget.displayName} located in local jail.",
-                    DiagnosticLogger.LogEntry.LogLevel.WARN
-                )
-                newStatus = TargetStatus.INCARCERATED
-                verificationSnippet = lockupResult.snippet
-            }
-
-            if (newStatus == TargetStatus.MONITORING) {
-                emitStep("resolving obituary registry URL")
-                val obitUrl = activeTarget.obituaryUrl
-                    ?: researchAgent.getDynamicObituaryUrl(activeTarget.areaCode, activeTarget.residenceInfo)
-                        .also { discoveredObitUrl = it }
-
-                emitStep("checking obituary registry")
-                DiagnosticLogger.log("Checking obituary registry for ${activeTarget.displayName} at $obitUrl")
-                val obitDoc = stealthScraper.scrapeGhostTown(obitUrl)
-                if (obitDoc != null) {
-                    val result = verifier.verifyIdentity(obitDoc.text(), activeTarget.displayName)
+            // Lockup loop. First confirmed match wins.
+            if (lockupSources.isEmpty()) {
+                emitStep("no automated lockup source for area ${target.areaCode ?: "?"}")
+            } else {
+                for (source in lockupSources) {
+                    emitStep("checking ${source.label}")
+                    val result = scrapeAgainstSource(source, firstName, lastName)
+                    if (result.skipped) break
                     if (result.isMatch) {
                         DiagnosticLogger.log(
-                            "DEATH DETECTED: ${activeTarget.displayName} found in obituary registry.",
+                            "MATCH: ${target.displayName} found via ${source.id}",
                             DiagnosticLogger.LogEntry.LogLevel.WARN
                         )
-                        newStatus = TargetStatus.DECEASED
+                        newStatus = TargetStatus.INCARCERATED
+                        discoveredLockupUrl = SourceUrlBuilder.buildEvidenceUrl(source, firstName, lastName)
                         verificationSnippet = result.snippet
+                        break
                     }
                 }
             }
 
-            var statusChangeTimestamp = activeTarget.lastStatusChangeTimestamp
-            if (newStatus != activeTarget.status && activeTarget.status != TargetStatus.UNKNOWN) {
+            // Obituary loop only if no lockup hit.
+            if (newStatus == TargetStatus.MONITORING && obituarySources.isNotEmpty()) {
+                for (source in obituarySources) {
+                    emitStep("checking ${source.label}")
+                    val result = scrapeAgainstSource(source, firstName, lastName)
+                    if (result.skipped) break
+                    if (result.isMatch) {
+                        DiagnosticLogger.log(
+                            "OBIT MATCH: ${target.displayName} found via ${source.id}",
+                            DiagnosticLogger.LogEntry.LogLevel.WARN
+                        )
+                        newStatus = TargetStatus.DECEASED
+                        discoveredObitUrl = SourceUrlBuilder.buildEvidenceUrl(source, firstName, lastName)
+                        verificationSnippet = result.snippet
+                        break
+                    }
+                }
+            }
+
+            var statusChangeTimestamp = target.lastStatusChangeTimestamp
+            if (newStatus != target.status && target.status != TargetStatus.UNKNOWN) {
                 emitStep("notifying status change")
-                notifications.notifyStatusChange(activeTarget.copy(status = newStatus), activeTarget.status)
+                notifications.notifyStatusChange(target.copy(status = newStatus), target.status)
                 statusChangeTimestamp = now
             }
 
             emitStep("persisting findings")
-            val updatedTarget = activeTarget.copy(
+            // Preserve any prior catalog-derived URL on this target (it may
+            // already point to a verified evidence page from a previous run);
+            // only overwrite when the current run produced a fresh match.
+            val updatedTarget = target.copy(
                 status = newStatus,
                 lastScrapedTimestamp = now,
-                lockupUrl = discoveredLockupUrl,
-                obituaryUrl = discoveredObitUrl,
-                nextScheduledCheck = now + (activeTarget.checkFrequencyHours * 3600000L),
+                lockupUrl = discoveredLockupUrl ?: keepIfFromCatalog(target.lockupUrl),
+                obituaryUrl = discoveredObitUrl ?: keepIfFromCatalog(target.obituaryUrl),
+                nextScheduledCheck = now + (target.checkFrequencyHours * 3600000L),
                 lastStatusChangeTimestamp = statusChangeTimestamp,
-                lastVerificationSnippet = verificationSnippet
+                lastVerificationSnippet = verificationSnippet ?: target.lastVerificationSnippet
             )
             repository.updateTarget(updatedTarget)
 
             emitStep("syncing back to system contacts")
             contactSyncer.syncToSystem(updatedTarget)
         } catch (e: Exception) {
-            android.util.Log.e("ScrapeUseCase", "The void refused to yield data for ${target.displayName}", e)
+            android.util.Log.e("ScrapeUseCase", "Pipeline error for ${target.displayName}", e)
         }
     }
+
+    private suspend fun scrapeAgainstSource(
+        source: Source,
+        first: String,
+        last: String
+    ): IdentityVerifier.VerificationResult {
+        val fetchUrl = try {
+            SourceUrlBuilder.buildFetchUrl(source, first, last)
+        } catch (e: IllegalArgumentException) {
+            // Source needs name slots but got blank — should be unreachable
+            // because pre-flight rejects unverifiable names, but defend anyway.
+            return IdentityVerifier.VerificationResult.fetchFailed()
+        }
+        val name = "$first $last"
+
+        return when (source.render) {
+            RenderMode.BASIC -> {
+                if (source.method.uppercase() == "POST") {
+                    val fields = SourceUrlBuilder.buildFormFields(source, first, last)
+                    basicScraper.scrapePost(fetchUrl, fields, name)
+                } else {
+                    basicScraper.scrapeMugshots(fetchUrl, name)
+                }
+            }
+            RenderMode.WEBVIEW -> {
+                val doc = stealthScraper.scrapeGhostTown(
+                    url = fetchUrl,
+                    settleMs = source.renderSettleMs,
+                    readySelector = source.readySelector
+                ) ?: return IdentityVerifier.VerificationResult.fetchFailed()
+                verifier.verifyIdentity(doc.text(), name)
+            }
+        }
+    }
+
+    private fun keepIfFromCatalog(url: String?): String? =
+        url?.takeIf { sourceCatalog.isFromCatalog(it) }
 }

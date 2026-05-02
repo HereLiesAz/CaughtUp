@@ -2,6 +2,7 @@ package com.hereliesaz.cleanunderwear.network
 
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,14 +45,72 @@ class IdentityVerifierTest {
     }
 
     @Test
-    fun verifyIdentity_mononymMatch_returnsTrue() {
-        val documentText = "Madonna performed yesterday."
-        assertTrue(verifier.verifyIdentity(documentText, "Madonna").isMatch)
+    fun verifyIdentity_singleTokenName_skipsWithReason() {
+        val result = verifier.verifyIdentity("B was here", "B")
+        assertFalse("Single-letter name must never match", result.isMatch)
+        assertTrue(result.skipped)
+        assertEquals("mononym", result.skipReason)
     }
 
     @Test
-    fun verifyIdentity_mononymNoMatch_returnsFalse() {
-        val documentText = "Cher performed yesterday."
-        assertFalse(verifier.verifyIdentity(documentText, "Madonna").isMatch)
+    fun verifyIdentity_mononymAcrossDocument_neverMatches() {
+        val documentText = "Madonna performed yesterday."
+        val result = verifier.verifyIdentity(documentText, "Madonna")
+        assertFalse(result.isMatch)
+        assertTrue(result.skipped)
+    }
+
+    @Test
+    fun verifyIdentity_shortToken_skips() {
+        val result = verifier.verifyIdentity("Jo Smith was arrested", "Jo Smith")
+        assertFalse(result.isMatch)
+        assertTrue(result.skipped)
+        assertEquals("first_token_unacceptable", result.skipReason)
+    }
+
+    @Test
+    fun verifyIdentity_stopwordAsFirstName_skips() {
+        val result = verifier.verifyIdentity(
+            "Search results: Smith, John was booked.",
+            "Search Smith"
+        )
+        assertFalse(result.isMatch)
+        assertTrue(result.skipped)
+    }
+
+    @Test
+    fun verifyIdentity_proximityRequired_distantTokensDoNotMatch() {
+        val documentText = buildString {
+            append("John ")
+            repeat(50) { append("filler ") }
+            append("Doe was the topic.")
+        }
+        val result = verifier.verifyIdentity(documentText, "John Doe")
+        assertFalse("First and last 50 tokens apart must not match", result.isMatch)
+    }
+
+    @Test
+    fun verifyIdentity_wordBoundary_singleLetterDoesNotMatchInsideOtherName() {
+        // Confirms the underlying bug fix: "B Smith" must not match because "B"
+        // alone is unverifiable and skipped before regex even runs. Also confirms
+        // that even if a longer token were checked, \b boundaries prevent
+        // partial-word matches like "B" -> "Bob".
+        val result = verifier.verifyIdentity("Bob Smith and Jane Doe", "B Smith")
+        assertFalse(result.isMatch)
+        assertTrue(result.skipped)
+    }
+
+    @Test
+    fun verifyIdentity_lastFirstWithStopword_skips() {
+        val result = verifier.verifyIdentity("Doe, Inmate", "Inmate Doe")
+        assertFalse(result.isMatch)
+        assertTrue(result.skipped)
+    }
+
+    @Test
+    fun verifyIdentity_hyphenatedName_matches() {
+        val documentText = "Mary-Jane Watson reported missing."
+        val result = verifier.verifyIdentity(documentText, "Mary-Jane Watson")
+        assertTrue(result.isMatch)
     }
 }

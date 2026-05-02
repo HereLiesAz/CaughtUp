@@ -50,7 +50,8 @@ class MainViewModel @Inject constructor(
     private val whatsAppHarvester: com.hereliesaz.cleanunderwear.data.WhatsAppHarvester,
     private val instagramHarvester: com.hereliesaz.cleanunderwear.data.InstagramHarvester,
     private val googleContactsHarvester: com.hereliesaz.cleanunderwear.data.GoogleContactsHarvester,
-    private val researchAgent: com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
+    private val researchAgent: com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent,
+    val sourceCatalog: com.hereliesaz.cleanunderwear.network.SourceCatalog
 ) : AndroidViewModel(application) {
 
     enum class SortOrder { NAME, STATUS, DATE }
