@@ -49,29 +49,3 @@ class RunPipelineUseCase @Inject constructor(
         pipeline.completeAll("Pipeline complete")
     }
 }
-
-/**
- * Helper to map sub-progress of individual phases onto a global 0.0 - 1.0 scale.
- */
-internal class PipelineProgress(
-    private val phases: List<String>,
-    private val onProgress: (Float, String) -> Unit
-) {
-    private var currentPhaseIndex = -1
-
-    fun beginPhase(name: String) {
-        currentPhaseIndex = phases.indexOf(name)
-    }
-
-    fun emit(subProgress: Float, description: String) {
-        if (currentPhaseIndex == -1) return
-        val totalPhases = phases.size
-        val overallProgress = (currentPhaseIndex + subProgress) / totalPhases
-        val phaseLabel = "Phase ${currentPhaseIndex + 1}/$totalPhases · ${phases[currentPhaseIndex]}"
-        onProgress(overallProgress, "$phaseLabel · $description")
-    }
-
-    fun completeAll(description: String) {
-        onProgress(1f, description)
-    }
-}

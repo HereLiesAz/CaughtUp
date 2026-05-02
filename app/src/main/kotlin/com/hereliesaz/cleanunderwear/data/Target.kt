@@ -65,7 +65,17 @@ data class TargetLite(
     @ColumnInfo(name = "status")
     val status: TargetStatus,
     @ColumnInfo(name = "email")
-    val email: String?
+    val email: String?,
+    @ColumnInfo(name = "residence_info")
+    val residenceInfo: String?,
+    @ColumnInfo(name = "source_account")
+    val sourceAccount: String?,
+    @ColumnInfo(name = "monitorability_state")
+    val monitorabilityState: MonitorabilityState,
+    @ColumnInfo(name = "last_scraped_timestamp")
+    val lastScrapedTimestamp: Long,
+    @ColumnInfo(name = "check_frequency_hours")
+    val checkFrequencyHours: Int
 )
 
 /**

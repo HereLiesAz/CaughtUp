@@ -21,14 +21,16 @@ interface TargetDao {
     // -- Lite list queries (projection — UI + dedup + triage) ----------------------------------
 
     @Query(
-        "SELECT id, display_name, phone_number, area_code, status, email " +
+        "SELECT id, display_name, phone_number, area_code, status, email, " +
+            "residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours " +
             "FROM targets ORDER BY display_name ASC"
     )
     fun getAllTargetsLite(): Flow<List<TargetLite>>
 
     @Query(
         """
-        SELECT id, display_name, phone_number, area_code, status, email 
+        SELECT id, display_name, phone_number, area_code, status, email,
+               residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours
         FROM targets 
         WHERE (display_name LIKE '%' || :query || '%' OR phone_number LIKE '%' || :query || '%' OR email LIKE '%' || :query || '%')
         AND (:showIgnored = 1 OR status != 'IGNORED')
@@ -74,7 +76,8 @@ interface TargetDao {
     ): Flow<List<TargetLite>>
 
     @Query(
-        "SELECT id, display_name, phone_number, area_code, status, email " +
+        "SELECT id, display_name, phone_number, area_code, status, email, " +
+            "residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours " +
             "FROM targets ORDER BY display_name ASC"
     )
     suspend fun getAllTargetsLiteSnapshot(): List<TargetLite>
