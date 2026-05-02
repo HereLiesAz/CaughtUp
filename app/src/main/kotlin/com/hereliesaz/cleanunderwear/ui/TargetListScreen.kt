@@ -44,6 +44,7 @@ fun TargetListScreen(
     val metaFilter by viewModel.metaFilter.collectAsState()
     val appleFilter by viewModel.appleFilter.collectAsState()
     val deviceFilter by viewModel.deviceFilter.collectAsState()
+    val pendingEnrichmentFilter by viewModel.pendingEnrichmentFilter.collectAsState()
     val showManualEntryDialog by viewModel.showManualEntryDialog.collectAsState()
 
     var selectedTargetIdForActions by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -121,6 +122,12 @@ fun TargetListScreen(
             TriStateFilterChip(state = emailOnlyFilter, onToggle = { viewModel.setEmailOnlyFilter(it) }, label = "Email Only")
             TriStateFilterChip(state = hasEmailFilter, onToggle = { viewModel.setEmailFilter(it) }, label = "Email")
             TriStateFilterChip(state = hasAddressFilter, onToggle = { viewModel.setAddressFilter(it) }, label = "Address")
+            VerticalDivider(modifier = Modifier.height(32.dp).align(Alignment.CenterVertically))
+            TriStateFilterChip(
+                state = pendingEnrichmentFilter,
+                onToggle = { viewModel.setPendingEnrichmentFilter(it) },
+                label = "Pending Enrichment"
+            )
         }
 
         if (targets.isEmpty()) {

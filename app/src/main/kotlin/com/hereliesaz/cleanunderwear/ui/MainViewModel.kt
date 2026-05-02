@@ -85,6 +85,12 @@ class MainViewModel @Inject constructor(
     private val _deviceFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
     val deviceFilter: StateFlow<Boolean?> = _deviceFilter
 
+    /**
+     * null = show all; true = only NEEDS_ENRICHMENT/ENRICHMENT_FAILED; false = only READY.
+     */
+    private val _pendingEnrichmentFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    val pendingEnrichmentFilter: StateFlow<Boolean?> = _pendingEnrichmentFilter
+
     private val _isDarkTheme = kotlinx.coroutines.flow.MutableStateFlow(prefs.getBoolean("dark_theme", false))
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
     
@@ -109,9 +115,10 @@ class MainViewModel @Inject constructor(
     val operationState: StateFlow<OperationState> = _operationState
 
     val targets: StateFlow<List<Target>> = kotlinx.coroutines.flow.combine(
-        _targets, _searchQuery, _sortOrder, _showIgnored, 
+        _targets, _searchQuery, _sortOrder, _showIgnored,
         _showNamelessFilter, _showEmailOnlyFilter, _hasEmailFilter, _hasAddressFilter,
-        _googleFilter, _metaFilter, _appleFilter, _deviceFilter
+        _googleFilter, _metaFilter, _appleFilter, _deviceFilter,
+        _pendingEnrichmentFilter
     ) { args ->
         val list = args[0] as List<Target>
         val query = args[1] as String
@@ -125,6 +132,7 @@ class MainViewModel @Inject constructor(
         val metaF = args[9] as Boolean?
         val appleF = args[10] as Boolean?
         val deviceF = args[11] as Boolean?
+        val pendingEnrichF = args[12] as Boolean?
 
         list.filter { target ->
             val targetSources = target.sourceAccount?.split(", ")?.toSet() ?: emptySet()
@@ -148,8 +156,13 @@ class MainViewModel @Inject constructor(
             val matchesEmail = hasEmailFilter == null || hasEmail == hasEmailFilter
             val matchesAddress = hasAddressFilter == null || hasAddress == hasAddressFilter
 
+            val isPendingEnrichment =
+                target.monitorabilityState != com.hereliesaz.cleanunderwear.data.MonitorabilityState.READY
+            val matchesPendingEnrich = pendingEnrichF == null || isPendingEnrichment == pendingEnrichF
+
             matchesGoogle && matchesMeta && matchesApple && matchesDevice &&
             matchesNameless && matchesEmailOnly && matchesEmail && matchesAddress &&
+            matchesPendingEnrich &&
             (showIgnored || target.status != TargetStatus.IGNORED) &&
             (target.displayName.contains(query, ignoreCase = true) || 
              target.phoneNumber?.contains(query) == true ||
@@ -214,6 +227,7 @@ class MainViewModel @Inject constructor(
     fun setMetaFilter(filter: Boolean?) { _metaFilter.value = filter }
     fun setAppleFilter(filter: Boolean?) { _appleFilter.value = filter }
     fun setDeviceFilter(filter: Boolean?) { _deviceFilter.value = filter }
+    fun setPendingEnrichmentFilter(filter: Boolean?) { _pendingEnrichmentFilter.value = filter }
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query

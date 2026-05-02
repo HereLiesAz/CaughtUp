@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * The physical manifestation of your localized surveillance state.
  */
-@Database(entities = [Target::class], version = 6, exportSchema = false)
+@Database(entities = [Target::class], version = 7, exportSchema = false)
 abstract class CleanUnderwearDatabase : RoomDatabase() {
     abstract fun targetDao(): TargetDao
 
@@ -93,6 +93,14 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE targets ADD COLUMN monitorability_state TEXT NOT NULL DEFAULT 'READY'"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): CleanUnderwearDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -100,7 +108,7 @@ abstract class CleanUnderwearDatabase : RoomDatabase() {
                     CleanUnderwearDatabase::class.java,
                     "cleanunderwear_database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
                 .also { Instance = it }
             }
