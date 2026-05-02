@@ -1,36 +1,18 @@
 package com.hereliesaz.cleanunderwear
 
 import android.app.Application
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
-import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 @HiltAndroidApp
-class CleanUnderwearApplication : Application() {
+class CleanUnderwearApplication : Application(), Configuration.Provider {
 
-    override fun onCreate() {
-        super.onCreate()
-        scheduleDragnet()
-    }
+    @Inject lateinit var workerFactory: HiltWorkerFactory
 
-    private fun scheduleDragnet() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
             .build()
-
-        val request = PeriodicWorkRequestBuilder<ScrapingWorker>(24, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "daily_incarceration_sweep",
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
-    }
 }

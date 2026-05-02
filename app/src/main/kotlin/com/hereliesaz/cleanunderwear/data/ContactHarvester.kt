@@ -174,10 +174,13 @@ class ContactHarvester(private val contentResolver: ContentResolver) {
 
         val lastCheckMatch = "Last Check: (.*?)(\n|$)".toRegex().find(note)
         lastCheckMatch?.let {
+            val raw = it.groupValues[1]
             try {
-                val date = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.US).parse(it.groupValues[1])
+                val date = java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.US).parse(raw)
                 data.lastCheckTimestamp = date?.time ?: 0L
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                DiagnosticLogger.log("Unparseable Last Check date in contact note: '$raw'")
+            }
         }
 
         val recordsMatch = "Records: (.*?)(\n|$)".toRegex().find(note)

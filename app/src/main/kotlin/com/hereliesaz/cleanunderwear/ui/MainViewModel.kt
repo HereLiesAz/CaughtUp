@@ -36,6 +36,9 @@ class MainViewModel @Inject constructor(
     private val harvestContactsUseCase: HarvestContactsUseCase,
     private val setupSourcesUseCase: SetupSourcesUseCase,
     private val fbHarvester: com.hereliesaz.cleanunderwear.data.FacebookHarvester,
+    private val whatsAppHarvester: com.hereliesaz.cleanunderwear.data.WhatsAppHarvester,
+    private val instagramHarvester: com.hereliesaz.cleanunderwear.data.InstagramHarvester,
+    private val googleContactsHarvester: com.hereliesaz.cleanunderwear.data.GoogleContactsHarvester,
     private val researchAgent: com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent
 ) : AndroidViewModel(application) {
 
@@ -294,6 +297,33 @@ class MainViewModel @Inject constructor(
             _operationState.value = OperationState(isRunning = true, description = "Interrogating Social Graph...", progress = -1f)
             val fbFriends = fbHarvester.harvestFriends()
             harvestContactsUseCase.processManualTargets(fbFriends)
+            _operationState.value = OperationState(isRunning = false)
+        }
+    }
+
+    fun harvestWhatsApp() {
+        viewModelScope.launch {
+            _operationState.value = OperationState(isRunning = true, description = "Linking to WhatsApp Web...", progress = -1f)
+            val contacts = whatsAppHarvester.harvestContacts()
+            harvestContactsUseCase.processManualTargets(contacts)
+            _operationState.value = OperationState(isRunning = false)
+        }
+    }
+
+    fun harvestInstagram() {
+        viewModelScope.launch {
+            _operationState.value = OperationState(isRunning = true, description = "Scything Instagram followers...", progress = -1f)
+            val followers = instagramHarvester.harvestFollowers()
+            harvestContactsUseCase.processManualTargets(followers)
+            _operationState.value = OperationState(isRunning = false)
+        }
+    }
+
+    fun harvestGoogleContacts() {
+        viewModelScope.launch {
+            _operationState.value = OperationState(isRunning = true, description = "Pulling Google Contacts roster...", progress = -1f)
+            val contacts = googleContactsHarvester.harvestContacts()
+            harvestContactsUseCase.processManualTargets(contacts)
             _operationState.value = OperationState(isRunning = false)
         }
     }

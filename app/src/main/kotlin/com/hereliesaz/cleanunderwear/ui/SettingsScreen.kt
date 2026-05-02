@@ -186,6 +186,27 @@ fun SettingsScreen(
                 shape = AzButtonShape.RECTANGLE
             )
 
+            AzButton(
+                text = "Interrogate WhatsApp Web",
+                onClick = { viewModel.harvestWhatsApp() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
+            )
+
+            AzButton(
+                text = "Interrogate Instagram Followers",
+                onClick = { viewModel.harvestInstagram() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
+            )
+
+            AzButton(
+                text = "Pull Google Contacts",
+                onClick = { viewModel.harvestGoogleContacts() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = AzButtonShape.RECTANGLE
+            )
+
             HorizontalDivider()
         }
     }

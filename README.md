@@ -15,10 +15,17 @@ Most people use "The Registry" to keep tabs on elderly relatives, estranged fami
 ## 🛠️ Core Surveillance Features
 
 ### 1. Multi-Source Harvesting
-Scythe through your digital ecosystems to build your Registry. Supports:
-- **Google & Apple Contacts**: Synced via your primary accounts.
-- **Meta Ecosystem**: Pulls in "Local" contacts from WhatsApp, Facebook, and Instagram syncs.
-- **Device Storage**: Legacy local-only contacts.
+Scythe through your digital ecosystems to build your Registry. Two surfaces:
+
+**Passive (system contacts).** A single sweep of the Android contacts provider folds in everything your device already syncs — Google, Apple/iCloud (where an iCloud sync provider is installed), WhatsApp, Facebook, and any local-only entries — bucketed by account type.
+
+**Active (web scrape).** Optional per-platform interrogators that drive a hidden WebView through each service's web surface and parse the DOM. Triggered on demand from Settings:
+- **Facebook** — scrapes `mbasic.facebook.com/me/friends` (server-rendered, no React shell).
+- **WhatsApp** — scrapes `web.whatsapp.com` chat list. Requires the user to QR-link the session in the WebView once.
+- **Instagram** — scrapes the followers list at `instagram.com/<me>/followers/`. Requires an active IG session cookie.
+- **Google Contacts** — scrapes `contacts.google.com`. Requires an active Google session cookie.
+
+Apple iCloud has no first-party web surface that survives bot detection on Android, so Apple contacts remain in the passive bucket only.
 
 ### 2. Autonomous Monitoring Engine
 - **The Daily Vigil**: Every morning at 9:00 AM, the app triggers a comprehensive scan of all active individuals in the Registry.

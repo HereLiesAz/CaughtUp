@@ -72,7 +72,10 @@ class OnDeviceResearchAgent @Inject constructor(
             val nicknameType = object : TypeToken<Map<String, List<String>>>() {}.type
             nicknames = gson.fromJson(nicknameJson, nicknameType)
         } catch (e: Exception) {
-            // Fallback to empty if assets are missing
+            DiagnosticLogger.log(
+                "Intelligence Agent: Failed to load triggers/nicknames assets. Falling back to empty maps. ${e.message}",
+                DiagnosticLogger.LogEntry.LogLevel.ERROR
+            )
         }
     }
 

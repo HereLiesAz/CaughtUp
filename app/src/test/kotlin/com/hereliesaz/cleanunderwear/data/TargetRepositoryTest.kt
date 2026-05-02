@@ -18,6 +18,9 @@ class TargetRepositoryTest {
         override fun updateTarget(target: Target) {
             targets.replaceAll { if (it.id == target.id) target else it }
         }
+        override fun deleteTarget(target: Target) {
+            targets.removeAll { it.id == target.id }
+        }
         override fun wipeSlateClean() { targets.clear() }
     }
 

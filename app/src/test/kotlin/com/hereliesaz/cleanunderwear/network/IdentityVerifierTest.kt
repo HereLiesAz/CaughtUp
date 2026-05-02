@@ -1,52 +1,57 @@
 package com.hereliesaz.cleanunderwear.network
 
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IdentityVerifierTest {
 
-    private val verifier = IdentityVerifier()
+    private val researchAgent: OnDeviceResearchAgent = mockk<OnDeviceResearchAgent>(relaxed = true).also {
+        every { it.getNicknames(any<String>()) } returns emptyList()
+    }
+    private val verifier = IdentityVerifier(researchAgent)
 
     @Test
     fun verifyIdentity_exactMatch_returnsTrue() {
         val documentText = "John Doe was arrested on Tuesday."
-        assertTrue(verifier.verifyIdentity(documentText, "John Doe"))
+        assertTrue(verifier.verifyIdentity(documentText, "John Doe").isMatch)
     }
 
     @Test
     fun verifyIdentity_lastFirstMatch_returnsTrue() {
         val documentText = "Doe, John"
-        assertTrue(verifier.verifyIdentity(documentText, "John Doe"))
+        assertTrue(verifier.verifyIdentity(documentText, "John Doe").isMatch)
     }
 
     @Test
     fun verifyIdentity_middleNameMatch_returnsTrue() {
         val documentText = "John Robert Doe"
-        assertTrue(verifier.verifyIdentity(documentText, "John Doe"))
+        assertTrue(verifier.verifyIdentity(documentText, "John Doe").isMatch)
     }
 
     @Test
     fun verifyIdentity_caseInsensitive_returnsTrue() {
         val documentText = "JOHN DOE"
-        assertTrue(verifier.verifyIdentity(documentText, "John Doe"))
+        assertTrue(verifier.verifyIdentity(documentText, "John Doe").isMatch)
     }
 
     @Test
     fun verifyIdentity_noMatch_returnsFalse() {
         val documentText = "Jane Doe was arrested."
-        assertFalse(verifier.verifyIdentity(documentText, "John Doe"))
+        assertFalse(verifier.verifyIdentity(documentText, "John Doe").isMatch)
     }
 
     @Test
     fun verifyIdentity_mononymMatch_returnsTrue() {
         val documentText = "Madonna performed yesterday."
-        assertTrue(verifier.verifyIdentity(documentText, "Madonna"))
+        assertTrue(verifier.verifyIdentity(documentText, "Madonna").isMatch)
     }
 
     @Test
     fun verifyIdentity_mononymNoMatch_returnsFalse() {
         val documentText = "Cher performed yesterday."
-        assertFalse(verifier.verifyIdentity(documentText, "Madonna"))
+        assertFalse(verifier.verifyIdentity(documentText, "Madonna").isMatch)
     }
 }

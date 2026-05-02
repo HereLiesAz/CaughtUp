@@ -50,11 +50,13 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                         isResumed = true
                         htmlCallback = null
                         continuation.resume(html)
-                        webView.post { 
+                        webView.post {
                             try {
                                 webView.stopLoading()
-                                webView.destroy() 
-                            } catch (e: Exception) {}
+                                webView.destroy()
+                            } catch (e: Exception) {
+                                android.util.Log.w("WebViewScraper", "destroy after injection failed", e)
+                            }
                         }
                     }
                 }
@@ -98,16 +100,18 @@ class WebViewScraper @Inject constructor(@ApplicationContext private val context
                     if (!isResumed) {
                         isResumed = true
                         continuation.resume(doc)
-                        webView.post { 
+                        webView.post {
                             try {
                                 webView.stopLoading()
                                 webView.clearHistory()
-                                webView.destroy() 
-                            } catch (e: Exception) {}
+                                webView.destroy()
+                            } catch (e: Exception) {
+                                android.util.Log.w("WebViewScraper", "destroy after ghost-town scrape failed", e)
+                            }
                         }
                     }
                 }
-                
+
                 continuation.invokeOnCancellation {
                     resumeOnce(null)
                 }
