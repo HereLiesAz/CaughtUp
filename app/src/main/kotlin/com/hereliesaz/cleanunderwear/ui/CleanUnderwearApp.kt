@@ -2,14 +2,14 @@ package com.hereliesaz.cleanunderwear.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -33,6 +33,10 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val showDiagnosticLog by viewModel.showDiagnosticLog.collectAsState()
     val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
+    val showIgnored by viewModel.showIgnored.collectAsState()
+    val sortOrder by viewModel.sortOrder.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    var isSearchOverlayVisible by remember { mutableStateOf(false) }
 
     val activeColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -70,38 +74,84 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
 
         if (isOnboardingCompleted) {
             azRailItem(
+                id = "search",
+                text = "Search",
+                content = "Search",
+                onClick = { isSearchOverlayVisible = !isSearchOverlayVisible }
+            )
+
+            azRailItem(
                 id = "registry",
                 text = "Registry",
                 route = "targetList",
-                content = AzComposableContent { Icon(Icons.Default.Groups, contentDescription = null) },
+                content = "Registry",
                 info = "View the complete surveillance list."
             )
 
-            azNestedRail(
+            azRailHostItem(
                 id = "intelligence_ops",
-                text = "Ops",
-                content = AzComposableContent { Icon(Icons.Default.Analytics, contentDescription = null) },
-                alignment = AzNestedRailAlignment.VERTICAL
+                text = "Operations",
+                content = "Operations"
+            )
+
+            azRailSubItem(
+                id = "ingest",
+                hostId = "intelligence_ops",
+                text = "Entry",
+                content = "Entry",
+                onClick = { viewModel.setShowManualEntryDialog(true) }
+            )
+            azRailSubItem(
+                id = "harvest",
+                hostId = "intelligence_ops",
+                text = "Harvest",
+                content = "Harvest",
+                onClick = { viewModel.sweepContacts() }
+            )
+            azRailSubItem(
+                id = "interrogate",
+                hostId = "intelligence_ops",
+                text = "Update",
+                content = "Update",
+                onClick = { viewModel.triggerManualInterrogation() }
+            )
+
+            azRailToggle(
+                id = "archives",
+                isChecked = showIgnored,
+                toggleOnText = "Hide",
+                toggleOffText = "Archives",
+                info = "Toggle visibility of archived targets."
             ) {
-                azRailItem(
-                    id = "ingest",
-                    text = "Ingest",
-                    content = AzComposableContent { Icon(Icons.Default.PersonAdd, contentDescription = null) },
-                    onClick = { viewModel.setShowManualEntryDialog(true) }
-                )
-                azRailItem(
-                    id = "harvest",
-                    text = "Harvest",
-                    content = AzComposableContent { Icon(Icons.Default.Radar, contentDescription = null) },
-                    onClick = { viewModel.sweepContacts() }
-                )
-                azRailItem(
-                    id = "interrogate",
-                    text = "Interrogate",
-                    content = AzComposableContent { Icon(Icons.Default.SavedSearch, contentDescription = null) },
-                    onClick = { viewModel.triggerManualInterrogation() }
-                )
+                viewModel.toggleShowIgnored()
             }
+
+            azRailHostItem(
+                id = "sort_host",
+                text = "Sort",
+                content = "Sort"
+            )
+            azRailSubItem(
+                id = "sort_name",
+                hostId = "sort_host",
+                text = "By Name",
+                content = "Name",
+                onClick = { viewModel.setSortOrder(MainViewModel.SortOrder.NAME) }
+            )
+            azRailSubItem(
+                id = "sort_status",
+                hostId = "sort_host",
+                text = "By Status",
+                content = "Status",
+                onClick = { viewModel.setSortOrder(MainViewModel.SortOrder.STATUS) }
+            )
+            azRailSubItem(
+                id = "sort_date",
+                hostId = "sort_host",
+                text = "By Date",
+                content = "Date",
+                onClick = { viewModel.setSortOrder(MainViewModel.SortOrder.DATE) }
+            )
 
             azDivider()
 
@@ -109,7 +159,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 id = "settings",
                 text = "Settings",
                 route = "settings",
-                content = AzComposableContent { Icon(Icons.Default.Settings, contentDescription = null) }
+                content = "Settings"
             )
             
             azMenuToggle(
@@ -121,11 +171,36 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
             )
         }
 
-        background(weight = 0) {
-            // Diagnostic log as a background layer that peeks through
-            if (showDiagnosticLog) {
-                Box(Modifier.fillMaxSize()) {
+        if (showDiagnosticLog) {
+            onscreen(Alignment.BottomEnd) {
+                Box(Modifier.fillMaxHeight(0.3f)) {
                     DiagnosticLogView(logs = diagnosticLogs)
+                }
+            }
+        }
+
+        if (isSearchOverlayVisible) {
+            onscreen(Alignment.TopCenter) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    tonalElevation = 8.dp,
+                    shadowElevation = 4.dp
+                ) {
+                    AzTextBox(
+                        value = searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        hint = "Search Registry...",
+                        modifier = Modifier.padding(8.dp),
+                        historyContext = "registry_search",
+                        onSubmit = { 
+                            viewModel.setSearchQuery(it)
+                            isSearchOverlayVisible = false
+                        }
+                    )
                 }
             }
         }
