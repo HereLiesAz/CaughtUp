@@ -11,8 +11,50 @@ class TargetRepositoryTest {
     private val fakeDao = object : TargetDao {
         var targets = mutableListOf<Target>()
 
+        private fun toLite(t: Target): TargetLite = TargetLite(
+            id = t.id,
+            displayName = t.displayName,
+            phoneNumber = t.phoneNumber,
+            areaCode = t.areaCode,
+            status = t.status,
+            lastScrapedTimestamp = t.lastScrapedTimestamp,
+            sourceAccount = t.sourceAccount,
+            residenceInfo = t.residenceInfo,
+            checkFrequencyHours = t.checkFrequencyHours,
+            nextScheduledCheck = t.nextScheduledCheck,
+            lastStatusChangeTimestamp = t.lastStatusChangeTimestamp,
+            email = t.email,
+            monitorabilityState = t.monitorabilityState
+        )
+
+        override fun getAllTargetsLite(): Flow<List<TargetLite>> = flowOf(targets.map(::toLite))
+        override suspend fun getAllTargetsLiteSnapshot(): List<TargetLite> = targets.map(::toLite)
+        override suspend fun getTargetById(id: Int): Target? = targets.firstOrNull { it.id == id }
+        override fun observeTargetById(id: Int): Flow<Target?> =
+            flowOf(targets.firstOrNull { it.id == id })
+        override suspend fun getTargetsByIds(ids: List<Int>): List<Target> =
+            targets.filter { it.id in ids }
+        override suspend fun getTargetsByMonitorability(state: MonitorabilityState): List<Target> =
+            targets.filter { it.monitorabilityState == state }
+        override suspend fun getReadyDueTargets(now: Long): List<Target> = targets.filter {
+            it.monitorabilityState == MonitorabilityState.READY &&
+                it.status != TargetStatus.IGNORED &&
+                it.nextScheduledCheck <= now
+        }
         override fun getAllTargets(): Flow<List<Target>> = flowOf(targets)
-        override fun getTargetsByStatus(status: TargetStatus): Flow<List<Target>> = flowOf(targets.filter { it.status == status })
+        override fun getTargetsByStatus(status: TargetStatus): Flow<List<Target>> =
+            flowOf(targets.filter { it.status == status })
+
+        override suspend fun updateMonitorabilityState(id: Int, state: MonitorabilityState) {
+            targets.replaceAll { if (it.id == id) it.copy(monitorabilityState = state) else it }
+        }
+        override suspend fun updateStatusOnly(id: Int, status: TargetStatus, timestamp: Long) {
+            targets.replaceAll {
+                if (it.id == id) it.copy(status = status, lastStatusChangeTimestamp = timestamp)
+                else it
+            }
+        }
+
         override fun insertTarget(target: Target) { targets.add(target) }
         override fun insertTargets(newTargets: List<Target>) { targets.addAll(newTargets) }
         override fun updateTarget(target: Target) {

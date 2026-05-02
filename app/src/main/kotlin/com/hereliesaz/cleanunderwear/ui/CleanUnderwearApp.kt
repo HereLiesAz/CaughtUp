@@ -160,12 +160,14 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                     arguments = listOf(navArgument("targetId") { type = NavType.IntType })
                 ) { backStackEntry ->
                     val targetId = backStackEntry.arguments?.getInt("targetId") ?: return@composable
-                    val targets by viewModel.targets.collectAsState()
-                    val target = targets.find { it.id == targetId }
+                    val target by viewModel
+                        .observeTarget(targetId)
+                        .collectAsState(initial = null)
 
-                    if (target != null) {
+                    val current = target
+                    if (current != null) {
                         TargetDetailScreen(
-                            target = target,
+                            target = current,
                             onUpdateTarget = { viewModel.updateTarget(it) },
                             onNavigateBack = { navController.popBackStack() }
                         )
