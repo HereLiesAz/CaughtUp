@@ -23,7 +23,7 @@ interface TargetDao {
 
     @Query(
         "SELECT id, display_name, phone_number, area_code, status, email, " +
-            "residence_info, source_account, monitorability_state, last_scraped_timestamp, check_frequency_hours " +
+            "last_status_change_timestamp, last_scraped_timestamp " +
             "FROM targets ORDER BY display_name ASC"
     )
     fun getAllTargetsLite(): Flow<List<TargetLite>>
@@ -82,6 +82,13 @@ interface TargetDao {
             "FROM targets ORDER BY display_name ASC LIMIT :limit OFFSET :offset"
     )
     suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite>
+
+    @Query(
+        "SELECT id, display_name, phone_number, email, area_code, status, residence_info, " +
+            "source_account, monitorability_state, last_scraped_timestamp " +
+            "FROM targets ORDER BY display_name ASC LIMIT :limit OFFSET :offset"
+    )
+    suspend fun getTargetWorkInfoPaged(limit: Int, offset: Int): List<TargetWorkInfo>
 
     @Query(
         "SELECT id, display_name, phone_number, email, area_code, status, residence_info, " +

@@ -218,6 +218,8 @@ fun TargetActionMenu(
     onAction: (String) -> Unit,
     viewModel: MainViewModel
 ) {
+    val fullTarget by viewModel.observeTarget(target.id).collectAsState(initial = null)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -246,7 +248,7 @@ fun TargetActionMenu(
         )
         ListItem(
             headlineContent = { Text("View Source Accounts") },
-            supportingContent = { Text(target.sourceAccount ?: "Unknown") },
+            supportingContent = { Text(fullTarget?.sourceAccount ?: "Loading...") },
             modifier = Modifier.clickable { onAction("sources") }
         )
         ListItem(
@@ -254,7 +256,7 @@ fun TargetActionMenu(
             modifier = Modifier.clickable { onAction("sites") }
         )
         ListItem(
-            headlineContent = { Text("Change Frequency (${target.checkFrequencyHours}h)") },
+            headlineContent = { Text("Change Frequency (${fullTarget?.checkFrequencyHours ?: "..."}h)") },
             modifier = Modifier.clickable { onAction("frequency") }
         )
     }

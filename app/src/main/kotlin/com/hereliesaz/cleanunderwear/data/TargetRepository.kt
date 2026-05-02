@@ -28,6 +28,7 @@ interface TargetRepository {
     ): PagingSource<Int, TargetLite>
 
     suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite>
+    suspend fun getTargetWorkInfoPaged(limit: Int, offset: Int): List<TargetWorkInfo>
     suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo>
 
     // Bounded full-row reads.
@@ -80,6 +81,9 @@ class OfflineTargetRepository(private val targetDao: TargetDao) : TargetReposito
 
     override suspend fun getTargetsPaged(limit: Int, offset: Int): List<TargetLite> =
         withContext(Dispatchers.IO) { targetDao.getTargetsPaged(limit, offset) }
+
+    override suspend fun getTargetWorkInfoPaged(limit: Int, offset: Int): List<TargetWorkInfo> =
+        withContext(Dispatchers.IO) { targetDao.getTargetWorkInfoPaged(limit, offset) }
 
     override suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo> =
         withContext(Dispatchers.IO) { targetDao.getAllTargetSourceInfo() }

@@ -1,9 +1,9 @@
 package com.hereliesaz.cleanunderwear.domain
 
 import com.hereliesaz.cleanunderwear.data.MonitorabilityState
-import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import com.hereliesaz.cleanunderwear.data.TargetWorkInfo
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -33,7 +33,7 @@ class TriageTargetsUseCase @Inject constructor(
         val chunkSize = 1000
         
         while (true) {
-            val chunk = repository.getTargetsPaged(chunkSize, offset)
+            val chunk = repository.getTargetWorkInfoPaged(chunkSize, offset)
             if (chunk.isEmpty()) break
             
             val totalProcessed = offset + chunk.size
@@ -94,7 +94,7 @@ class TriageTargetsUseCase @Inject constructor(
         TriageResult(readyCount, needsEnrichmentCount, ignoredCount)
     }
 
-    private fun decide(target: TargetLite): MonitorabilityState {
+    private fun decide(target: TargetWorkInfo): MonitorabilityState {
         val hasRealName = isRealName(target.displayName)
         val hasPhone = (target.phoneNumber?.filter { it.isDigit() }?.length ?: 0) >= 10
         val hasLocation = !target.residenceInfo.isNullOrBlank() ||
