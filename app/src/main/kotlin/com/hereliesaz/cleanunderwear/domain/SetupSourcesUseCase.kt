@@ -24,7 +24,7 @@ class SetupSourcesUseCase @Inject constructor(
     private val areaSemaphore = Semaphore(2) // Reduced concurrency to mitigate 429s
 
     suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }) = coroutineScope {
-        val targets = repository.getAllTargets().first()
+        val targets = repository.getAllTargetSourceInfo()
         if (targets.isEmpty()) {
             onProgress(1f, "Registry is empty.")
             return@coroutineScope
@@ -60,11 +60,10 @@ class SetupSourcesUseCase @Inject constructor(
                     // Apply these sources to EVERYONE in this area who is missing them
                     areaTargets.forEach { target ->
                         if (target.lockupUrl == null || target.obituaryUrl == null) {
-                            repository.updateTarget(
-                                target.copy(
-                                    lockupUrl = target.lockupUrl ?: areaLockupUrl,
-                                    obituaryUrl = target.obituaryUrl ?: areaObitUrl
-                                )
+                            repository.updateUrls(
+                                id = target.id,
+                                lockupUrl = target.lockupUrl ?: areaLockupUrl,
+                                obituaryUrl = target.obituaryUrl ?: areaObitUrl
                             )
                         }
                     }

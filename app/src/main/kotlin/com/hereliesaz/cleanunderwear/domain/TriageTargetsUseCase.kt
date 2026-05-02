@@ -5,6 +5,11 @@ import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -12,61 +17,76 @@ import javax.inject.Inject
  * it has the minimum identifying data to be monitored against public records, or whether it
  * should be queued for cyberbackgroundchecks enrichment.
  *
- * Rule for READY:
- *   - displayName is a real name (not "Unnamed Entity" / "Unnamed Entity (...)"), AND
- *   - has at least one of: phone number with >=10 digits OR (residenceInfo or areaCode != "LOCAL")
- *
- * Anything else moves to NEEDS_ENRICHMENT (unless it was already ENRICHMENT_FAILED, in which
- * case we leave it alone so we don't churn cybg lookups every cycle).
- *
- * IGNORED targets are skipped — the user explicitly archived them.
- *
- * State changes are persisted via a targeted UPDATE on the monitorability column only — no
- * full-row read or write is needed.
+ * Parallelized to handle large registries (8000+ contacts) efficiently.
  */
 class TriageTargetsUseCase @Inject constructor(
     private val repository: TargetRepository
 ) {
     data class TriageResult(val ready: Int, val needsEnrichment: Int, val ignored: Int)
 
-    suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }): TriageResult {
+    suspend operator fun invoke(onProgress: (Float, String) -> Unit = { _, _ -> }): TriageResult = coroutineScope {
         val all = repository.getAllTargetsLiteSnapshot()
         if (all.isEmpty()) {
             onProgress(1f, "No targets to triage")
-            return TriageResult(0, 0, 0)
+            return@coroutineScope TriageResult(0, 0, 0)
+        }
+        
+        // 1. Calculate new states in parallel across all CPU cores
+        val results = withContext(Dispatchers.Default) {
+            all.map { target ->
+                async {
+                    if (target.status == TargetStatus.IGNORED) {
+                        target.id to null // Skip archived
+                    } else {
+                        target.id to decide(target)
+                    }
+                }
+            }.awaitAll()
         }
 
-        var ready = 0
-        var needsEnrichment = 0
-        var ignored = 0
-        val total = all.size
+        val toReady = mutableListOf<Int>()
+        val toNeedsEnrichment = mutableListOf<Int>()
+        val toEnrichmentFailed = mutableListOf<Int>()
+        
+        var readyCount = 0
+        var needsEnrichmentCount = 0
+        var ignoredCount = 0
 
-        for ((index, target) in all.withIndex()) {
-            if (target.status == TargetStatus.IGNORED) {
-                ignored++
-                onProgress((index + 1).toFloat() / total, "Skipping archived: ${target.displayName}")
-                continue
+        // 2. Aggregate results and identify needed changes
+        results.forEach { (id, newState) ->
+            val original = all.find { it.id == id } ?: return@forEach
+            
+            if (newState == null) {
+                ignoredCount++
+            } else {
+                if (newState != original.monitorabilityState) {
+                    when (newState) {
+                        MonitorabilityState.READY -> toReady.add(id)
+                        MonitorabilityState.NEEDS_ENRICHMENT -> toNeedsEnrichment.add(id)
+                        MonitorabilityState.ENRICHMENT_FAILED -> toEnrichmentFailed.add(id)
+                    }
+                }
+                
+                if (newState == MonitorabilityState.READY) readyCount++ else needsEnrichmentCount++
             }
-
-            val newState = decide(target)
-
-            if (newState != target.monitorabilityState) {
-                repository.updateMonitorabilityState(target.id, newState)
-            }
-
-            when (newState) {
-                MonitorabilityState.READY -> ready++
-                MonitorabilityState.NEEDS_ENRICHMENT, MonitorabilityState.ENRICHMENT_FAILED -> needsEnrichment++
-            }
-
-            onProgress(
-                (index + 1).toFloat() / total,
-                "${index + 1}/$total · ${target.displayName}"
-            )
         }
 
-        DiagnosticLogger.log("Triage: $ready ready, $needsEnrichment need enrichment, $ignored archived")
-        return TriageResult(ready, needsEnrichment, ignored)
+        // 3. Perform high-speed batch updates
+        if (toReady.isNotEmpty()) {
+            onProgress(0.9f, "Committing ${toReady.size} ready targets...")
+            repository.updateMonitorabilityStateBatch(toReady, MonitorabilityState.READY)
+        }
+        if (toNeedsEnrichment.isNotEmpty()) {
+            onProgress(0.95f, "Queuing ${toNeedsEnrichment.size} for enrichment...")
+            repository.updateMonitorabilityStateBatch(toNeedsEnrichment, MonitorabilityState.NEEDS_ENRICHMENT)
+        }
+        if (toEnrichmentFailed.isNotEmpty()) {
+            repository.updateMonitorabilityStateBatch(toEnrichmentFailed, MonitorabilityState.ENRICHMENT_FAILED)
+        }
+
+        DiagnosticLogger.log("Triage (Parallel): $readyCount ready, $needsEnrichmentCount need enrichment, $ignoredCount archived")
+        onProgress(1f, "Triage complete.")
+        TriageResult(readyCount, needsEnrichmentCount, ignoredCount)
     }
 
     private fun decide(target: TargetLite): MonitorabilityState {

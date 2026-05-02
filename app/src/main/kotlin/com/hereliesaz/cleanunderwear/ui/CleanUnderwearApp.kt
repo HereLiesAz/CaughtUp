@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -72,32 +73,32 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 id = "registry",
                 text = "Registry",
                 route = "targetList",
-                content = Icons.Default.Groups,
+                content = AzComposableContent { Icon(Icons.Default.Groups, contentDescription = null) },
                 info = "View the complete surveillance list."
             )
 
             azNestedRail(
                 id = "intelligence_ops",
                 text = "Ops",
-                content = Icons.Default.Analytics,
+                content = AzComposableContent { Icon(Icons.Default.Analytics, contentDescription = null) },
                 alignment = AzNestedRailAlignment.VERTICAL
             ) {
                 azRailItem(
                     id = "ingest",
                     text = "Ingest",
-                    content = Icons.Default.PersonAdd,
+                    content = AzComposableContent { Icon(Icons.Default.PersonAdd, contentDescription = null) },
                     onClick = { viewModel.setShowManualEntryDialog(true) }
                 )
                 azRailItem(
                     id = "harvest",
                     text = "Harvest",
-                    content = Icons.Default.Radar,
+                    content = AzComposableContent { Icon(Icons.Default.Radar, contentDescription = null) },
                     onClick = { viewModel.sweepContacts() }
                 )
                 azRailItem(
                     id = "interrogate",
                     text = "Interrogate",
-                    content = Icons.Default.SavedSearch,
+                    content = AzComposableContent { Icon(Icons.Default.SavedSearch, contentDescription = null) },
                     onClick = { viewModel.triggerManualInterrogation() }
                 )
             }
@@ -108,7 +109,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 id = "settings",
                 text = "Settings",
                 route = "settings",
-                content = Icons.Default.Settings
+                content = AzComposableContent { Icon(Icons.Default.Settings, contentDescription = null) }
             )
             
             azMenuToggle(

@@ -51,14 +51,7 @@ enum class TargetStatus {
 }
 
 /**
- * Lightweight projection of [Target] used by the list UI and the dedup/triage phases.
- *
- * Excludes the three largest columns — lockup_url, obituary_url, last_verification_snippet —
- * plus the unused jurisdiction column. With ~1700+ rows and a 2 MB Android CursorWindow, loading
- * full Target rows into memory crashes; the lite projection keeps per-row size small enough that
- * the entire registry fits comfortably.
- *
- * The TargetDetailScreen still fetches the full [Target] by id when the user opens a profile.
+ * Lightweight projection of [Target] used by the list UI.
  */
 data class TargetLite(
     @ColumnInfo(name = "id")
@@ -71,22 +64,25 @@ data class TargetLite(
     val areaCode: String?,
     @ColumnInfo(name = "status")
     val status: TargetStatus,
-    @ColumnInfo(name = "last_scraped_timestamp")
-    val lastScrapedTimestamp: Long,
-    @ColumnInfo(name = "source_account")
-    val sourceAccount: String?,
+    @ColumnInfo(name = "email")
+    val email: String?
+)
+
+/**
+ * Used by [com.hereliesaz.cleanunderwear.domain.SetupSourcesUseCase] to group targets by area
+ * and check for missing intelligence URLs without loading massive verification snippets.
+ */
+data class TargetSourceInfo(
+    @ColumnInfo(name = "id")
+    val id: Int,
+    @ColumnInfo(name = "area_code")
+    val areaCode: String?,
     @ColumnInfo(name = "residence_info")
     val residenceInfo: String?,
-    @ColumnInfo(name = "check_frequency_hours")
-    val checkFrequencyHours: Int,
-    @ColumnInfo(name = "next_scheduled_check")
-    val nextScheduledCheck: Long,
-    @ColumnInfo(name = "last_status_change_timestamp")
-    val lastStatusChangeTimestamp: Long,
-    @ColumnInfo(name = "email")
-    val email: String?,
-    @ColumnInfo(name = "monitorability_state")
-    val monitorabilityState: MonitorabilityState
+    @ColumnInfo(name = "lockup_url")
+    val lockupUrl: String?,
+    @ColumnInfo(name = "obituary_url")
+    val obituaryUrl: String?
 )
 
 /**

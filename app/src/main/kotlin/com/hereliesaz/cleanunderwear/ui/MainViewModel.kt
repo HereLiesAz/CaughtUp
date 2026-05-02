@@ -15,12 +15,16 @@ import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import kotlinx.coroutines.flow.Flow
+import com.hereliesaz.cleanunderwear.domain.DeduplicateTargetsUseCase
 import com.hereliesaz.cleanunderwear.domain.HarvestContactsUseCase
-import com.hereliesaz.cleanunderwear.domain.SetupSourcesUseCase
+import com.hereliesaz.cleanunderwear.domain.TriageTargetsUseCase
 import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -36,7 +40,8 @@ class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: TargetRepository,
     private val harvestContactsUseCase: HarvestContactsUseCase,
-    private val setupSourcesUseCase: SetupSourcesUseCase,
+    private val deduplicateTargetsUseCase: DeduplicateTargetsUseCase,
+    private val triageTargetsUseCase: TriageTargetsUseCase,
     private val fbHarvester: com.hereliesaz.cleanunderwear.data.FacebookHarvester,
     private val whatsAppHarvester: com.hereliesaz.cleanunderwear.data.WhatsAppHarvester,
     private val instagramHarvester: com.hereliesaz.cleanunderwear.data.InstagramHarvester,
@@ -48,63 +53,61 @@ class MainViewModel @Inject constructor(
 
     private val workManager = WorkManager.getInstance(application)
 
-    private val _targets = repository.getAllTargetsLite()
-    
-    private val _searchQuery = kotlinx.coroutines.flow.MutableStateFlow("")
+    private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    private val _sortOrder = kotlinx.coroutines.flow.MutableStateFlow(SortOrder.NAME)
+    private val _sortOrder = MutableStateFlow(SortOrder.NAME)
     val sortOrder: StateFlow<SortOrder> = _sortOrder
 
-    private val _showIgnored = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val _showIgnored = MutableStateFlow(false)
     val showIgnored: StateFlow<Boolean> = _showIgnored
 
-    private val _showNamelessFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _showNamelessFilter = MutableStateFlow<Boolean?>(null)
     val showNamelessFilter: StateFlow<Boolean?> = _showNamelessFilter
 
-    private val _showEmailOnlyFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _showEmailOnlyFilter = MutableStateFlow<Boolean?>(null)
     val showEmailOnlyFilter: StateFlow<Boolean?> = _showEmailOnlyFilter
 
-    private val _hasEmailFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _hasEmailFilter = MutableStateFlow<Boolean?>(null)
     val hasEmailFilter: StateFlow<Boolean?> = _hasEmailFilter
 
-    private val _hasAddressFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _hasAddressFilter = MutableStateFlow<Boolean?>(null)
     val hasAddressFilter: StateFlow<Boolean?> = _hasAddressFilter
 
     private val prefs = application.getSharedPreferences("clean_underwear_prefs", Context.MODE_PRIVATE)
-    private val _isOnboardingCompleted = kotlinx.coroutines.flow.MutableStateFlow(prefs.getBoolean("onboarding_done", false))
+    private val _isOnboardingCompleted = MutableStateFlow(prefs.getBoolean("onboarding_done", false))
     val isOnboardingCompleted: StateFlow<Boolean> = _isOnboardingCompleted
 
-    private val _googleFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _googleFilter = MutableStateFlow<Boolean?>(null)
     val googleFilter: StateFlow<Boolean?> = _googleFilter
 
-    private val _metaFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _metaFilter = MutableStateFlow<Boolean?>(null)
     val metaFilter: StateFlow<Boolean?> = _metaFilter
 
-    private val _appleFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _appleFilter = MutableStateFlow<Boolean?>(null)
     val appleFilter: StateFlow<Boolean?> = _appleFilter
 
-    private val _deviceFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _deviceFilter = MutableStateFlow<Boolean?>(null)
     val deviceFilter: StateFlow<Boolean?> = _deviceFilter
 
     /**
      * null = show all; true = only NEEDS_ENRICHMENT/ENRICHMENT_FAILED; false = only READY.
      */
-    private val _pendingEnrichmentFilter = kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+    private val _pendingEnrichmentFilter = MutableStateFlow<Boolean?>(null)
     val pendingEnrichmentFilter: StateFlow<Boolean?> = _pendingEnrichmentFilter
 
-    private val _isDarkTheme = kotlinx.coroutines.flow.MutableStateFlow(prefs.getBoolean("dark_theme", false))
+    private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("dark_theme", false))
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
     
-    private val _showDiagnosticLog = kotlinx.coroutines.flow.MutableStateFlow(prefs.getBoolean("show_diagnostic_log", false))
+    private val _showDiagnosticLog = MutableStateFlow(prefs.getBoolean("show_diagnostic_log", false))
     val showDiagnosticLog: StateFlow<Boolean> = _showDiagnosticLog
 
     val diagnosticLogs = com.hereliesaz.cleanunderwear.util.DiagnosticLogger.logs
 
-    private val _globalTargetLimit = kotlinx.coroutines.flow.MutableStateFlow(prefs.getInt("global_limit", 100))
+    private val _globalTargetLimit = MutableStateFlow(prefs.getInt("global_limit", 100))
     val globalTargetLimit: StateFlow<Int> = _globalTargetLimit
 
-    private val _showManualEntryDialog = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private val _showManualEntryDialog = MutableStateFlow(false)
     val showManualEntryDialog: StateFlow<Boolean> = _showManualEntryDialog
 
     data class OperationState(
@@ -113,75 +116,32 @@ class MainViewModel @Inject constructor(
         val progress: Float = 0f // 0.0 to 1.0, or -1f for indeterminate
     )
 
-    private val _operationState = kotlinx.coroutines.flow.MutableStateFlow(OperationState())
+    private val _operationState = MutableStateFlow(OperationState())
     val operationState: StateFlow<OperationState> = _operationState
 
-    val targets: StateFlow<List<TargetLite>> = kotlinx.coroutines.flow.combine(
-        _targets, _searchQuery, _sortOrder, _showIgnored,
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val targets: StateFlow<List<TargetLite>> = combine(
+        _searchQuery, _sortOrder, _showIgnored,
         _showNamelessFilter, _showEmailOnlyFilter, _hasEmailFilter, _hasAddressFilter,
         _googleFilter, _metaFilter, _appleFilter, _deviceFilter,
         _pendingEnrichmentFilter
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        val list = args[0] as List<TargetLite>
-        val query = args[1] as String
-        val sort = args[2] as SortOrder
-        val showIgnored = args[3] as Boolean
-        val namelessFilter = args[4] as Boolean?
-        val emailOnlyFilter = args[5] as Boolean?
-        val hasEmailFilter = args[6] as Boolean?
-        val hasAddressFilter = args[7] as Boolean?
-        val googleF = args[8] as Boolean?
-        val metaF = args[9] as Boolean?
-        val appleF = args[10] as Boolean?
-        val deviceF = args[11] as Boolean?
-        val pendingEnrichF = args[12] as Boolean?
-
-        list.filter { target ->
-            val targetSources = target.sourceAccount?.split(", ")?.toSet() ?: emptySet()
-            val isGoogle = targetSources.contains("Google")
-            val isMeta = targetSources.contains("Meta")
-            val isApple = targetSources.contains("Apple")
-            val isDevice = targetSources.isEmpty() || targetSources.contains("Device")
-
-            val matchesGoogle = googleF == null || isGoogle == googleF
-            val matchesMeta = metaF == null || isMeta == metaF
-            val matchesApple = appleF == null || isApple == appleF
-            val matchesDevice = deviceF == null || isDevice == deviceF
-
-            val isNameless = target.displayName == "Unnamed Entity"
-            val isEmailOnly = target.phoneNumber == null && target.email != null
-            val hasEmail = target.email != null
-            val hasAddress = !target.residenceInfo.isNullOrBlank()
-
-            val matchesNameless = namelessFilter == null || isNameless == namelessFilter
-            val matchesEmailOnly = emailOnlyFilter == null || isEmailOnly == emailOnlyFilter
-            val matchesEmail = hasEmailFilter == null || hasEmail == hasEmailFilter
-            val matchesAddress = hasAddressFilter == null || hasAddress == hasAddressFilter
-
-            val isPendingEnrichment =
-                target.monitorabilityState != com.hereliesaz.cleanunderwear.data.MonitorabilityState.READY
-            val matchesPendingEnrich = pendingEnrichF == null || isPendingEnrichment == pendingEnrichF
-
-            matchesGoogle && matchesMeta && matchesApple && matchesDevice &&
-            matchesNameless && matchesEmailOnly && matchesEmail && matchesAddress &&
-            matchesPendingEnrich &&
-            (showIgnored || target.status != TargetStatus.IGNORED) &&
-            (target.displayName.contains(query, ignoreCase = true) || 
-             target.phoneNumber?.contains(query) == true ||
-             target.email?.contains(query, ignoreCase = true) == true)
-        }.sortedWith { a, b ->
-            // Always prioritize status changes
-            if (a.lastStatusChangeTimestamp != b.lastStatusChangeTimestamp) {
-                b.lastStatusChangeTimestamp.compareTo(a.lastStatusChangeTimestamp)
-            } else {
-                when (sort) {
-                    SortOrder.NAME -> a.displayName.compareTo(b.displayName)
-                    SortOrder.STATUS -> a.status.name.compareTo(b.status.name)
-                    SortOrder.DATE -> b.lastScrapedTimestamp.compareTo(a.lastScrapedTimestamp)
-                }
-            }
-        }
+    ) { args: Array<Any?> ->
+        args
+    }.flatMapLatest { args ->
+        repository.searchTargets(
+            query = args[0] as String,
+            sort = (args[1] as SortOrder).name,
+            showIgnored = args[2] as Boolean,
+            namelessF = args[3] as Boolean?,
+            emailOnlyF = args[4] as Boolean?,
+            hasEmailF = args[5] as Boolean?,
+            hasAddressF = args[6] as Boolean?,
+            googleF = args[7] as Boolean?,
+            metaF = args[8] as Boolean?,
+            appleF = args[9] as Boolean?,
+            deviceF = args[10] as Boolean?,
+            pendingEnrichF = args[11] as Boolean?
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -300,14 +260,19 @@ class MainViewModel @Inject constructor(
 
         Log.d("MainViewModel", "Sweeping contacts with sources: $activeSources")
         viewModelScope.launch {
-            _operationState.value = OperationState(isRunning = true, description = "Scything local databases...", progress = -1f)
+            _operationState.value = OperationState(isRunning = true, description = "Scything local databases...", progress = 0.1f)
+            
+            // 1. Ingest raw data from enabled sources
             harvestContactsUseCase(activeSources)
             
-            setupSourcesUseCase { progress, description ->
-                _operationState.value = _operationState.value.copy(
-                    progress = progress,
-                    description = description
-                )
+            // 2. Consolidate and deduplicate the full registry
+            _operationState.value = _operationState.value.copy(description = "Merging duplicate identities...", progress = 0.4f)
+            deduplicateTargetsUseCase { sub, desc -> }
+            
+            // 3. Triage for monitorability (Parallelized)
+            _operationState.value = _operationState.value.copy(description = "Triaging registry for vigil readiness...", progress = 0.7f)
+            triageTargetsUseCase { sub, desc -> 
+                _operationState.value = _operationState.value.copy(progress = 0.7f + (sub * 0.3f))
             }
             
             _operationState.value = OperationState(isRunning = false)

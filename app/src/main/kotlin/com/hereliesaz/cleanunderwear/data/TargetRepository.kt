@@ -11,7 +11,22 @@ interface TargetRepository {
 
     // Lite reads — what the UI list screen and the dedup/triage phases use.
     fun getAllTargetsLite(): Flow<List<TargetLite>>
+    fun searchTargets(
+        query: String,
+        showIgnored: Boolean,
+        googleF: Boolean?,
+        metaF: Boolean?,
+        appleF: Boolean?,
+        deviceF: Boolean?,
+        namelessF: Boolean?,
+        emailOnlyF: Boolean?,
+        hasEmailF: Boolean?,
+        hasAddressF: Boolean?,
+        pendingEnrichF: Boolean?,
+        sort: String
+    ): Flow<List<TargetLite>>
     suspend fun getAllTargetsLiteSnapshot(): List<TargetLite>
+    suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo>
 
     // Bounded full-row reads.
     suspend fun getTargetById(id: Int): Target?
@@ -26,7 +41,9 @@ interface TargetRepository {
 
     // Targeted updates.
     suspend fun updateMonitorabilityState(id: Int, state: MonitorabilityState)
+    suspend fun updateMonitorabilityStateBatch(ids: List<Int>, state: MonitorabilityState)
     suspend fun updateStatusOnly(id: Int, status: TargetStatus, timestamp: Long)
+    suspend fun updateUrls(id: Int, lockupUrl: String?, obituaryUrl: String?)
 
     // Mutations.
     suspend fun insertTarget(target: Target)
@@ -39,8 +56,31 @@ interface TargetRepository {
 class OfflineTargetRepository(private val targetDao: TargetDao) : TargetRepository {
 
     override fun getAllTargetsLite(): Flow<List<TargetLite>> = targetDao.getAllTargetsLite()
+    
+    override fun searchTargets(
+        query: String,
+        showIgnored: Boolean,
+        googleF: Boolean?,
+        metaF: Boolean?,
+        appleF: Boolean?,
+        deviceF: Boolean?,
+        namelessF: Boolean?,
+        emailOnlyF: Boolean?,
+        hasEmailF: Boolean?,
+        hasAddressF: Boolean?,
+        pendingEnrichF: Boolean?,
+        sort: String
+    ): Flow<List<TargetLite>> = targetDao.searchTargets(
+        query, showIgnored, googleF, metaF, appleF, deviceF,
+        namelessF, emailOnlyF, hasEmailF, hasAddressF,
+        pendingEnrichF, sort
+    )
+
     override suspend fun getAllTargetsLiteSnapshot(): List<TargetLite> =
         withContext(Dispatchers.IO) { targetDao.getAllTargetsLiteSnapshot() }
+
+    override suspend fun getAllTargetSourceInfo(): List<TargetSourceInfo> =
+        withContext(Dispatchers.IO) { targetDao.getAllTargetSourceInfo() }
 
     override suspend fun getTargetById(id: Int): Target? =
         withContext(Dispatchers.IO) { targetDao.getTargetById(id) }
@@ -63,8 +103,14 @@ class OfflineTargetRepository(private val targetDao: TargetDao) : TargetReposito
     override suspend fun updateMonitorabilityState(id: Int, state: MonitorabilityState) =
         withContext(Dispatchers.IO) { targetDao.updateMonitorabilityState(id, state) }
 
+    override suspend fun updateMonitorabilityStateBatch(ids: List<Int>, state: MonitorabilityState) =
+        withContext(Dispatchers.IO) { targetDao.updateMonitorabilityStateBatch(ids, state) }
+
     override suspend fun updateStatusOnly(id: Int, status: TargetStatus, timestamp: Long) =
         withContext(Dispatchers.IO) { targetDao.updateStatusOnly(id, status, timestamp) }
+
+    override suspend fun updateUrls(id: Int, lockupUrl: String?, obituaryUrl: String?) =
+        withContext(Dispatchers.IO) { targetDao.updateUrls(id, lockupUrl, obituaryUrl) }
 
     override suspend fun insertTarget(target: Target) =
         withContext(Dispatchers.IO) { targetDao.insertTarget(target) }
