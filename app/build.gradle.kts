@@ -16,14 +16,21 @@ val versionProps = Properties().apply {
 }
 
 var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
+var currentVersionPatch = versionProps.getProperty("versionPatch", "0").toInt()
 
-// Automatically increment versionCode for release builds
-val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
-if (isReleaseBuild) {
+// Automatically increment version values for builds
+val isBuilding = gradle.startParameter.taskNames.any {
+    val task = it.lowercase()
+    task.contains("assemble") || task.contains("bundle") || task.contains("install")
+}
+
+if (isBuilding) {
     currentVersionCode++
+    currentVersionPatch++
     versionProps.setProperty("versionBuild", currentVersionCode.toString())
+    versionProps.setProperty("versionPatch", currentVersionPatch.toString())
     versionPropsFile.outputStream().use {
-        versionProps.store(it, "Auto-incremented by release build")
+        versionProps.store(it, "Auto-incremented by build")
     }
 }
 
