@@ -171,13 +171,7 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
             )
         }
 
-        if (showDiagnosticLog) {
-            onscreen(Alignment.BottomEnd) {
-                Box(Modifier.fillMaxHeight(0.3f)) {
-                    DiagnosticLogView(logs = diagnosticLogs)
-                }
-            }
-        }
+
 
         if (isSearchOverlayVisible) {
             onscreen(Alignment.TopCenter) {

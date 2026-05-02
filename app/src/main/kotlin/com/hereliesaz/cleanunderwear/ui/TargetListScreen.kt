@@ -67,7 +67,64 @@ fun TargetListScreen(
         }
     }
     val sheetState = rememberModalBottomSheetState()
-    
+    @Composable
+    fun DiagnosticLogView(logs: List<com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry>) {
+        val clipboard = LocalClipboard.current
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+            tonalElevation = 8.dp
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "UNDER-THE-HOOD ACTIVITY",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Row {
+                        IconButton(
+                            onClick = {
+                                val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                                scope.launch {
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("Intelligence Log", fullLog)))
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Log", modifier = Modifier.size(16.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, fullLog)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, "Share Intelligence Log"))
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Share Log", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                HorizontalDivider()
+            }
+        }
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         AzTextBox(
             value = searchQuery,
@@ -103,21 +160,7 @@ fun TargetListScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Sort:", style = MaterialTheme.typography.labelSmall)
-            AzCycler(
-                options = MainViewModel.SortOrder.entries.map { it.name },
-                selectedOption = sortOrder.name,
-                onCycle = { name -> 
-                    viewModel.setSortOrder(MainViewModel.SortOrder.valueOf(name))
-                }
-            )
-            
-            AzToggle(
-                isChecked = showIgnored,
-                onToggle = { viewModel.toggleShowIgnored() },
-                toggleOnText = "Hide Archived",
-                toggleOffText = "Show Archived"
-            )
+
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -359,86 +402,8 @@ fun TriStateFilterChip(
     )
 }
 
-@Composable
-fun DiagnosticLogView(logs: List<com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry>) {
-    val clipboard = LocalClipboard.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-        tonalElevation = 8.dp
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "UNDER-THE-HOOD ACTIVITY",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Row {
-                    IconButton(
-                        onClick = {
-                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
-                            scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("Intelligence Log", fullLog)))
-                            }
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Log", modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(
-                        onClick = {
-                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
-                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(android.content.Intent.EXTRA_TEXT, fullLog)
-                            }
-                            context.startActivity(android.content.Intent.createChooser(intent, "Share Intelligence Log"))
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share Log", modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-            HorizontalDivider()
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(8.dp)
-            ) {
-                items(logs) { entry ->
-                    val color = when (entry.level) {
-                        com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.ERROR -> MaterialTheme.colorScheme.error
-                        com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.WARN -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    Text(
-                        text = "[${entry.timestamp}] ${entry.message}",
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = androidx.compose.ui.unit.TextUnit.Unspecified, // Uses default which is fine
-                            color = color
-                        ),
-                        modifier = Modifier.padding(vertical = 1.dp),
-                        fontSize = MaterialTheme.typography.labelSmall.fontSize
-                    )
-                }
-            }
-        }
-    }
-}
+
+
 
 @Composable
 fun ManualEntryDialog(
