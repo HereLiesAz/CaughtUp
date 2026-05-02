@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -37,9 +38,10 @@ fun TargetListScreen(
 ) {
     val targets = viewModel.targets.collectAsLazyPagingItems()
     val operationState by viewModel.operationState.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
     val showIgnored by viewModel.showIgnored.collectAsState()
+    val showDiagnosticLog by viewModel.showDiagnosticLog.collectAsState()
+    val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
     val namelessFilter by viewModel.showNamelessFilter.collectAsState()
     val emailOnlyFilter by viewModel.showEmailOnlyFilter.collectAsState()
     val hasEmailFilter by viewModel.hasEmailFilter.collectAsState()
@@ -72,6 +74,12 @@ fun TargetListScreen(
         val clipboard = LocalClipboard.current
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
+        val logListState = rememberLazyListState()
+
+        // Auto-scroll to most recent line as new entries arrive.
+        LaunchedEffect(logs.size) {
+            if (logs.isNotEmpty()) logListState.animateScrollToItem(logs.lastIndex)
+        }
 
         Surface(
             modifier = Modifier
@@ -80,62 +88,92 @@ fun TargetListScreen(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
             tonalElevation = 8.dp
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "UNDER-THE-HOOD ACTIVITY",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "UNDER-THE-HOOD ACTIVITY",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-                    Row {
-                        IconButton(
-                            onClick = {
-                                val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
-                                scope.launch {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("Intelligence Log", fullLog)))
-                                }
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy Log", modifier = Modifier.size(16.dp))
+                LazyColumn(
+                    state = logListState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                ) {
+                    items(logs) { entry ->
+                        val color = when (entry.level) {
+                            com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.ERROR ->
+                                MaterialTheme.colorScheme.error
+                            com.hereliesaz.cleanunderwear.util.DiagnosticLogger.LogEntry.LogLevel.WARN ->
+                                MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurface
                         }
-                        IconButton(
-                            onClick = {
-                                val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
-                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, fullLog)
-                                }
-                                context.startActivity(android.content.Intent.createChooser(intent, "Share Intelligence Log"))
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share Log", modifier = Modifier.size(16.dp))
-                        }
+                        Text(
+                            text = "[${entry.timestamp}] ${entry.message}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = color,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 1.dp)
+                        )
                     }
                 }
+
                 HorizontalDivider()
+
+                // Action icons live under the log so they don't compete with
+                // the title row for horizontal space and stay reachable when
+                // the user scrolls through entries.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    androidx.compose.ui.platform.ClipEntry(
+                                        android.content.ClipData.newPlainText("Intelligence Log", fullLog)
+                                    )
+                                )
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Log", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            val fullLog = logs.joinToString("\n") { "[${it.timestamp}] ${it.message}" }
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, fullLog)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(intent, "Share Intelligence Log"))
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Log", modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        AzTextBox(
-            value = searchQuery,
-            onValueChange = { viewModel.setSearchQuery(it) },
-            hint = "Interrogate Registry...",
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            historyContext = "registry_search",
-            onSubmit = { viewModel.setSearchQuery(it) }
-        )
+        // Diagnostic log lives at the very top of the registry view so it sits
+        // above the progress bar and the list. Toggled via the rail's
+        // "Log" menu — search bar lives behind the rail's "Search" item now.
+        if (showDiagnosticLog) {
+            DiagnosticLogView(diagnosticLogs)
+        }
 
         if (operationState.isRunning) {
             LinearProgressIndicator(
