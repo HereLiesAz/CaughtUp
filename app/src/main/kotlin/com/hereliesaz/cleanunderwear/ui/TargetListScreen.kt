@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.cleanunderwear.data.Target
+import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import kotlinx.coroutines.launch
 
@@ -183,7 +184,7 @@ fun TargetListScreen(
 
 @Composable
 fun TargetActionMenu(
-    target: Target,
+    target: TargetLite,
     onAction: (String) -> Unit,
     viewModel: MainViewModel
 ) {
@@ -195,16 +196,16 @@ fun TargetActionMenu(
         if (target.status == TargetStatus.IGNORED) {
             ListItem(
                 headlineContent = { Text("Resume Monitoring") },
-                modifier = Modifier.clickable { 
-                    viewModel.restoreTarget(target)
+                modifier = Modifier.clickable {
+                    viewModel.restoreTarget(target.id)
                     onAction("restore")
                 }
             )
         } else {
             ListItem(
                 headlineContent = { Text("Archive & Stop Monitoring") },
-                modifier = Modifier.clickable { 
-                    viewModel.ignoreTarget(target)
+                modifier = Modifier.clickable {
+                    viewModel.ignoreTarget(target.id)
                     onAction("ignore")
                 }
             )
@@ -231,7 +232,7 @@ fun TargetActionMenu(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun TargetItem(target: Target, onClick: () -> Unit, onLongClick: () -> Unit) {
+fun TargetItem(target: TargetLite, onClick: () -> Unit, onLongClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()

@@ -91,18 +91,20 @@ class OnDeviceResearchAgent @Inject constructor(
         
         // Secondary Heuristic: A real name usually has at least one space and no numbers
         // Or if it's a single word, it should be alphabetic and longer than 1 char (e.g. "Az")
+        // Refined to allow hyphens and apostrophes.
         val hasSpace = text.trim().contains(" ")
-        val isAlphaOnly = text.all { it.isLetter() }
+        val isAlphaish = text.all { it.isLetter() || it == '-' || it == '\'' || it == ' ' }
         val hasNoDigits = text.none { it.isDigit() }
-        val looksLikeName = (hasSpace || (text.length > 1 && isAlphaOnly)) && hasNoDigits
+        val looksLikeName = (hasSpace || (text.length > 1 && isAlphaish)) && hasNoDigits
 
         val score = scoreWithModel(text)
         
         val serviceKeywords = listOf("customer", "service", "support", "help", "bank", "office", "pizza", "taxi", "delivery", "store")
         val isService = serviceKeywords.any { text.contains(it, ignoreCase = true) }
         
-        // If AI gives 0.0, we rely on the looksLikeName heuristic to avoid total failure
-        val isValid = if (score == 0.0f) looksLikeName else (score > 0.3f && !isService)
+        // Use a combination of AI score and heuristics. If the AI is not highly confident (>0.3),
+        // we fall back to the heuristic check to avoid rejecting valid names (the "Every Contact" bug).
+        val isValid = (score > 0.3f || looksLikeName) && !isService
 
         if (!isValid) {
             DiagnosticLogger.log("AI Flag: '$text' interrogated and rejected. (Score: $score, Heuristic: $looksLikeName)")

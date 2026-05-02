@@ -11,8 +11,10 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.hereliesaz.cleanunderwear.data.Target
+import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import kotlinx.coroutines.flow.Flow
 import com.hereliesaz.cleanunderwear.domain.HarvestContactsUseCase
 import com.hereliesaz.cleanunderwear.domain.SetupSourcesUseCase
 import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
@@ -46,7 +48,7 @@ class MainViewModel @Inject constructor(
 
     private val workManager = WorkManager.getInstance(application)
 
-    private val _targets = repository.getAllTargets()
+    private val _targets = repository.getAllTargetsLite()
     
     private val _searchQuery = kotlinx.coroutines.flow.MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -114,13 +116,14 @@ class MainViewModel @Inject constructor(
     private val _operationState = kotlinx.coroutines.flow.MutableStateFlow(OperationState())
     val operationState: StateFlow<OperationState> = _operationState
 
-    val targets: StateFlow<List<Target>> = kotlinx.coroutines.flow.combine(
+    val targets: StateFlow<List<TargetLite>> = kotlinx.coroutines.flow.combine(
         _targets, _searchQuery, _sortOrder, _showIgnored,
         _showNamelessFilter, _showEmailOnlyFilter, _hasEmailFilter, _hasAddressFilter,
         _googleFilter, _metaFilter, _appleFilter, _deviceFilter,
         _pendingEnrichmentFilter
     ) { args ->
-        val list = args[0] as List<Target>
+        @Suppress("UNCHECKED_CAST")
+        val list = args[0] as List<TargetLite>
         val query = args[1] as String
         val sort = args[2] as SortOrder
         val showIgnored = args[3] as Boolean
@@ -191,17 +194,22 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun ignoreTarget(target: Target) {
+    fun ignoreTarget(id: Int) {
         viewModelScope.launch {
-            repository.updateTarget(target.copy(status = TargetStatus.IGNORED))
+            repository.updateStatusOnly(id, TargetStatus.IGNORED, System.currentTimeMillis())
         }
     }
 
-    fun restoreTarget(target: Target) {
+    fun restoreTarget(id: Int) {
         viewModelScope.launch {
-            repository.updateTarget(target.copy(status = TargetStatus.UNKNOWN))
+            repository.updateStatusOnly(id, TargetStatus.UNKNOWN, System.currentTimeMillis())
         }
     }
+
+    /**
+     * Reactive single-target stream for the detail screen. Avoids materializing the full list.
+     */
+    fun observeTarget(id: Int): Flow<Target?> = repository.observeTargetById(id)
     
     fun toggleShowIgnored() {
         _showIgnored.value = !_showIgnored.value

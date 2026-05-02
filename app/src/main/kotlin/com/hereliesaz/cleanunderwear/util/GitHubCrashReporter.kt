@@ -5,6 +5,7 @@ import android.util.Log
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -43,7 +44,7 @@ class GitHubCrashReporter(private val context: Context) {
                 $stackTrace
                 ```
             """.trimIndent())
-            put("labels", listOf("bug", "crash"))
+            put("labels", JSONArray().apply { put("bug"); put("crash") })
         }
 
         val requestBody = bodyJson.toString().toRequestBody("application/json".toMediaType())
