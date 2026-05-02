@@ -1,114 +1,110 @@
 package com.hereliesaz.cleanunderwear.network
 
 import com.hereliesaz.cleanunderwear.data.Target
-import com.hereliesaz.cleanunderwear.util.CyberBackgroundChecks
+import com.hereliesaz.cleanunderwear.domain.BrowserMission
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Phone- and name-based lookups against cyberbackgroundchecks.com.
+ * Identity enrichment via cyberbackgroundchecks.com.
  *
- * Strategy (in order, stopping at the first hit):
- *   1. If the target has a phone number, try /phone/<digits>.
- *   2. If a real name is known, try /people/<first>-<last>/<state> (state guessed from areaCode
- *      or residenceInfo) and parse the first result card.
+ * The site is JS-heavy and bot-defended; the user's real browser session is
+ * the only reliable way to reach the result page. So this class does *not*
+ * fetch anything — it picks the best [BrowserMission] for a target, and
+ * parses the HTML the user-visible [com.hereliesaz.cleanunderwear.ui.BrowserScreen]
+ * brings back.
  *
- * The site is JS-heavy and behind bot detection, so we drive everything through WebViewScraper
- * (the existing "ghost town" mode), which carries a real Chrome UA and lets Cloudflare's
- * JavaScript challenge complete before we read the DOM.
+ * Search-mode priority (per the user, "if there's a contact, then at least
+ * ONE of those ways is searchable"):
+ *
+ *   phone → email → address → name
  */
 @Singleton
-class CyberBackgroundChecksEnricher @Inject constructor(
-    private val scraper: WebViewScraper
-) {
+class CyberBackgroundChecksEnricher @Inject constructor() {
+
     /**
-     * Returns a copy of [target] with whatever fields cybg surfaced, or null if the lookup found
-     * nothing useful.
+     * Returns the most-precise mission this target supports, or null if none
+     * of the four search inputs are present (caller should mark the target
+     * ENRICHMENT_FAILED).
      */
-    suspend fun enrich(target: Target): Target? {
-        val byPhone = target.phoneNumber
+    fun pickMission(target: Target): BrowserMission? {
+        val phone = target.phoneNumber
             ?.filter { it.isDigit() }
             ?.takeIf { it.length >= 10 }
-            ?.let { lookupByPhone(it) }
-        if (byPhone != null) {
-            DiagnosticLogger.log("CYBG: phone lookup populated ${target.phoneNumber} → ${byPhone.name ?: "<no name>"}")
-            return mergeFindings(target, byPhone)
-        }
+        if (phone != null) return BrowserMission.CbcByPhone(phone)
 
-        val byName = target.displayName
-            .takeIf { it.isNotBlank() && it != "Unnamed Entity" && !it.startsWith("Unnamed Entity (") }
-            ?.let { lookupByName(it, stateGuess(target)) }
-        if (byName != null) {
-            DiagnosticLogger.log("CYBG: name lookup populated ${target.displayName}")
-            return mergeFindings(target, byName)
+        val email = target.email?.takeIf { it.isNotBlank() && it.contains("@") }
+        if (email != null) return BrowserMission.CbcByEmail(email)
+
+        val address = target.residenceInfo?.takeIf { it.isNotBlank() }
+        if (address != null) return BrowserMission.CbcByAddress(address)
+
+        val displayName = target.displayName.takeIf {
+            it.isNotBlank() &&
+                it != "Unnamed Entity" &&
+                !it.startsWith("Unnamed Entity (") &&
+                it.split(" ").size >= 2
         }
+        if (displayName != null) return BrowserMission.CbcByName(displayName)
 
         return null
     }
 
-    private suspend fun lookupByPhone(digits: String): Findings? {
-        val url = CyberBackgroundChecks.getPhoneSearchUrl(digits)
-        val doc = scraper.scrapeGhostTown(url) ?: return null
+    /**
+     * Pulls name / address / phone out of a CBC results page. Returns null
+     * if the page didn't surface anything useful (no result, captcha wall,
+     * etc.).
+     */
+    fun parseFindings(html: String): Findings? {
+        if (html.isBlank()) return null
+        val doc = Jsoup.parse(html)
 
-        val name = doc.select(".name, h1.full-name, .person-name").firstOrNull()?.text()?.trim()
-            ?.takeIf { it.isNotBlank() }
-        val address = doc.select(".address, .current-address, .person-address").firstOrNull()
+        // The first result card. CSS classes drift across CBC redesigns,
+        // so try a handful of plausible roots.
+        val firstCard: Element = doc.selectFirst(
+            ".person-card, .result-card, .search-result, .card-person, [data-result-card]"
+        ) ?: doc
+
+        val name = firstCard
+            .selectFirst(".name, h1.full-name, .full-name, .person-name, h2, h3")
             ?.text()?.trim()?.takeIf { it.isNotBlank() }
 
-        if (name == null && address == null) return null
-        return Findings(name = name, address = address, phone = digits)
-    }
-
-    private suspend fun lookupByName(displayName: String, state: String?): Findings? {
-        val parts = displayName.split(" ").filter { it.isNotBlank() }
-        if (parts.size < 2) return null
-
-        val baseUrl = CyberBackgroundChecks.getNameSearchUrl(displayName)
-        val url = if (state.isNullOrBlank()) baseUrl
-                  else "$baseUrl/${state.lowercase().replace(" ", "-")}"
-
-        val doc = scraper.scrapeGhostTown(url) ?: return null
-
-        // The first result card in the search list. CSS classes drift; we try a few candidates.
-        val firstCard = doc.select(".person-card, .result-card, .search-result").firstOrNull()
-            ?: doc
-
-        val name = firstCard.select(".name, .full-name, h2, h3").firstOrNull()?.text()?.trim()
-            ?.takeIf { it.isNotBlank() }
-        val address = firstCard.select(".address, .current-address, .city-state").firstOrNull()
+        val address = firstCard
+            .selectFirst(".address, .current-address, .person-address, .city-state")
             ?.text()?.trim()?.takeIf { it.isNotBlank() }
-        val phone = firstCard.select(".phone, .phone-number, [href^=tel]").firstOrNull()
-            ?.text()?.trim()?.filter { it.isDigit() || it == '+' }?.takeIf { it.length >= 10 }
+
+        val phone = firstCard
+            .selectFirst(".phone, .phone-number, [href^=tel]")
+            ?.text()?.trim()
+            ?.filter { it.isDigit() || it == '+' }
+            ?.takeIf { it.length >= 10 }
 
         if (name == null && address == null && phone == null) return null
         return Findings(name = name, address = address, phone = phone)
     }
 
-    private fun stateGuess(target: Target): String? {
-        // Prefer the residence info if it looks like "City, ST 12345"
-        val residence = target.residenceInfo
-        if (!residence.isNullOrBlank()) {
-            val twoLetterState = Regex(",\\s*([A-Z]{2})\\b").find(residence)?.groupValues?.get(1)
-            if (twoLetterState != null) return twoLetterState
-            // Also accept "City, State Name 12345" -> grab the word(s) between commas
-            val pieces = residence.split(",").map { it.trim() }
-            if (pieces.size >= 2) return pieces[1].split(" ").firstOrNull()?.takeIf { it.isNotBlank() }
-        }
-        return null
-    }
+    /**
+     * Folds [findings] into [target] without trampling fields the registry
+     * already knows. Existing values win — enrichment fills gaps, doesn't
+     * overwrite user-edited data.
+     */
+    fun merge(target: Target, findings: Findings): Target {
+        val nameWasPlaceholder = target.displayName.isBlank() ||
+            target.displayName == "Unnamed Entity" ||
+            target.displayName.startsWith("Unnamed Entity (")
 
-    private fun mergeFindings(target: Target, f: Findings): Target {
-        return target.copy(
-            displayName = if (target.displayName == "Unnamed Entity" ||
-                target.displayName.startsWith("Unnamed Entity (")) {
-                f.name ?: target.displayName
-            } else target.displayName,
-            phoneNumber = target.phoneNumber ?: f.phone,
-            residenceInfo = target.residenceInfo ?: f.address,
-            areaCode = target.areaCode ?: f.phone?.takeLast(10)?.take(3)
+        val merged = target.copy(
+            displayName = if (nameWasPlaceholder && findings.name != null) findings.name else target.displayName,
+            phoneNumber = target.phoneNumber ?: findings.phone,
+            residenceInfo = target.residenceInfo ?: findings.address,
+            areaCode = target.areaCode ?: findings.phone?.takeLast(10)?.take(3)
         )
+        DiagnosticLogger.log("CYBG merge: ${target.displayName} → ${merged.displayName} (phone=${merged.phoneNumber != null}, addr=${merged.residenceInfo != null})")
+        return merged
     }
 
-    private data class Findings(val name: String?, val address: String?, val phone: String?)
+    data class Findings(val name: String?, val address: String?, val phone: String?)
 }

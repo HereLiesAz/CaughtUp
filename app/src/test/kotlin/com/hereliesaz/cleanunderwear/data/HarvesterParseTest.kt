@@ -27,7 +27,7 @@ class HarvesterParseTest {
             </body></html>
         """.trimIndent()
 
-        val targets = invokeParse(FacebookHarvester(scraperStub), "parseFriendsHtml", html)
+        val targets = FacebookHarvester().parseFriendsHtml(html)
 
         val names = targets.map { it.displayName }.toSet()
         assertTrue("Alice Smith was missed: $names", "Alice Smith" in names)

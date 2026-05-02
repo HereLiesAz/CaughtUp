@@ -12,31 +12,34 @@ import javax.inject.Inject
  *
  * Identity enrichment (resolving UNVERIFIED contacts via cyberbackgroundchecks)
  * is intentionally absent — it's user-initiated, not auto-run. See
- * `EnrichTargetsUseCase` and the user-visible browser flow.
+ * `MainViewModel.resolveUnverifiedBatch` and `BrowserScreen`.
  */
 class RunPipelineUseCase @Inject constructor(
     private val deduplicate: DeduplicateTargetsUseCase,
     private val triage: TriageTargetsUseCase,
-    private val scrape: ScrapeTargetsUseCase
+    private val scrape: ScrapeTargetsUseCase,
+    private val coordinator: PipelineCoordinator
 ) {
     private val phases = listOf("Deduplicating", "Triaging", "Monitoring")
 
     suspend operator fun invoke(onProgress: (Float, String) -> Unit) {
-        val pipeline = PipelineProgress(phases, onProgress)
+        coordinator.runExclusive("auto-pipeline") {
+            val pipeline = PipelineProgress(phases, onProgress)
 
-        pipeline.beginPhase("Deduplicating")
-        val merged = deduplicate { sub, desc -> pipeline.emit(sub, desc) }
-        DiagnosticLogger.log("Pipeline: dedup merged $merged duplicate row(s)")
+            pipeline.beginPhase("Deduplicating")
+            val merged = deduplicate { sub, desc -> pipeline.emit(sub, desc) }
+            DiagnosticLogger.log("Pipeline: dedup merged $merged duplicate row(s)")
 
-        pipeline.beginPhase("Triaging")
-        val triageResult = triage { sub, desc -> pipeline.emit(sub, desc) }
-        DiagnosticLogger.log(
-            "Pipeline: triage → ${triageResult.ready} ready / ${triageResult.needsEnrichment} need enrichment"
-        )
+            pipeline.beginPhase("Triaging")
+            val triageResult = triage { sub, desc -> pipeline.emit(sub, desc) }
+            DiagnosticLogger.log(
+                "Pipeline: triage → ${triageResult.ready} ready / ${triageResult.needsEnrichment} need enrichment"
+            )
 
-        pipeline.beginPhase("Monitoring")
-        scrape { sub, desc -> pipeline.emit(sub, desc) }
+            pipeline.beginPhase("Monitoring")
+            scrape { sub, desc -> pipeline.emit(sub, desc) }
 
-        pipeline.completeAll("Pipeline complete")
+            pipeline.completeAll("Pipeline complete")
+        }
     }
 }

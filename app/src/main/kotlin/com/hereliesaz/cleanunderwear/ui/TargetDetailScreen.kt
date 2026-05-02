@@ -17,9 +17,11 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import com.hereliesaz.cleanunderwear.domain.BrowserMission
 import com.hereliesaz.cleanunderwear.network.SourceCatalog
 import com.hereliesaz.cleanunderwear.network.SourceKind
 import com.hereliesaz.cleanunderwear.util.CyberBackgroundChecks
+import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,6 +32,7 @@ fun TargetDetailScreen(
     target: Target,
     sourceCatalog: SourceCatalog,
     onUpdateTarget: (Target) -> Unit,
+    onLaunchMission: (BrowserMission, (String?) -> Unit) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -148,14 +151,25 @@ fun TargetDetailScreen(
                         AzButton(
                             text = "Resolve Identity Now",
                             onClick = {
-                                val url = target.phoneNumber?.let {
-                                    CyberBackgroundChecks.getPhoneSearchUrl(it)
+                                // Pick the best mode the contact supports —
+                                // phone is most precise, name is least.
+                                val mission: BrowserMission = target.phoneNumber?.let {
+                                    BrowserMission.CbcByPhone(it)
                                 } ?: target.email?.let {
-                                    CyberBackgroundChecks.getEmailSearchUrl(it)
+                                    BrowserMission.CbcByEmail(it)
                                 } ?: target.residenceInfo?.let {
-                                    CyberBackgroundChecks.getAddressSearchUrl(it)
-                                } ?: CyberBackgroundChecks.getNameSearchUrl(target.displayName)
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    BrowserMission.CbcByAddress(it)
+                                } ?: BrowserMission.CbcByName(target.displayName)
+
+                                onLaunchMission(mission) { html ->
+                                    // Result parsing lands in a follow-up
+                                    // (PR6c). For now just log so the round-
+                                    // trip is observable.
+                                    DiagnosticLogger.log(
+                                        "Identity mission for ${target.displayName} returned " +
+                                            (html?.length?.let { "$it chars" } ?: "no payload")
+                                    )
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = AzButtonShape.RECTANGLE

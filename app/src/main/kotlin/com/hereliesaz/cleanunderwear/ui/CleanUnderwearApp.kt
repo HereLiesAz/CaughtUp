@@ -115,6 +115,13 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                 content = "Update",
                 onClick = { viewModel.triggerManualInterrogation() }
             )
+            azRailSubItem(
+                id = "resolve",
+                hostId = "intelligence_ops",
+                text = "Resolve",
+                content = "Resolve",
+                onClick = { viewModel.resolveUnverifiedBatch() }
+            )
 
             azRailToggle(
                 id = "archives",
@@ -200,8 +207,23 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
         }
 
         onscreen {
+            // Mission overlay: when a BrowserMission is active, the visible
+            // WebView screen takes over the whole content area. This honors
+            // the rule that cyberbackgroundchecks / Facebook flows must use
+            // the user's real session, not a covert WebView.
+            val activeMission by viewModel.activeMission.collectAsState()
+            val mission = activeMission
+            if (mission != null) {
+                BrowserScreen(
+                    mission = mission.mission,
+                    onComplete = { html -> viewModel.completeMission(html) },
+                    onCancel = { viewModel.cancelMission() }
+                )
+                return@onscreen
+            }
+
             val startDestination = if (isOnboardingCompleted) "targetList" else "onboarding"
-            
+
             NavHost(navController = navController, startDestination = startDestination) {
                 composable("onboarding") {
                     OnboardingScreen(onComplete = {
@@ -240,6 +262,9 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
                             target = current,
                             sourceCatalog = viewModel.sourceCatalog,
                             onUpdateTarget = { viewModel.updateTarget(it) },
+                            onLaunchMission = { mission, onResult ->
+                                viewModel.launchMission(mission, onResult)
+                            },
                             onNavigateBack = { navController.popBackStack() }
                         )
                     }

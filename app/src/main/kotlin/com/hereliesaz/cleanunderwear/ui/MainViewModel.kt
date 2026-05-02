@@ -15,9 +15,12 @@ import com.hereliesaz.cleanunderwear.data.TargetLite
 import com.hereliesaz.cleanunderwear.data.TargetRepository
 import com.hereliesaz.cleanunderwear.data.TargetStatus
 import kotlinx.coroutines.flow.Flow
+import com.hereliesaz.cleanunderwear.domain.BrowserMission
 import com.hereliesaz.cleanunderwear.domain.DeduplicateTargetsUseCase
 import com.hereliesaz.cleanunderwear.domain.HarvestContactsUseCase
+import com.hereliesaz.cleanunderwear.domain.PipelineCoordinator
 import com.hereliesaz.cleanunderwear.domain.TriageTargetsUseCase
+import kotlinx.coroutines.CompletableDeferred
 import com.hereliesaz.cleanunderwear.worker.ScrapingWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.paging.Pager
@@ -51,7 +54,9 @@ class MainViewModel @Inject constructor(
     private val instagramHarvester: com.hereliesaz.cleanunderwear.data.InstagramHarvester,
     private val googleContactsHarvester: com.hereliesaz.cleanunderwear.data.GoogleContactsHarvester,
     private val researchAgent: com.hereliesaz.cleanunderwear.network.OnDeviceResearchAgent,
-    val sourceCatalog: com.hereliesaz.cleanunderwear.network.SourceCatalog
+    val sourceCatalog: com.hereliesaz.cleanunderwear.network.SourceCatalog,
+    private val cbcEnricher: com.hereliesaz.cleanunderwear.network.CyberBackgroundChecksEnricher,
+    private val pipelineCoordinator: PipelineCoordinator
 ) : AndroidViewModel(application) {
 
     enum class SortOrder { NAME, STATUS, DATE }
@@ -114,6 +119,38 @@ class MainViewModel @Inject constructor(
 
     private val _showManualEntryDialog = MutableStateFlow(false)
     val showManualEntryDialog: StateFlow<Boolean> = _showManualEntryDialog
+
+    /**
+     * The browser mission currently being shown to the user, if any. When
+     * non-null, the UI overlays [com.hereliesaz.cleanunderwear.ui.BrowserScreen]
+     * over the rest of the app. The result handler is captured so the caller
+     * (e.g. the "Resolve Identity Now" button on TargetDetailScreen) can
+     * react to whatever HTML the BrowserScreen extracts.
+     */
+    data class ActiveMission(
+        val mission: com.hereliesaz.cleanunderwear.domain.BrowserMission,
+        val onResult: (String?) -> Unit
+    )
+
+    private val _activeMission = MutableStateFlow<ActiveMission?>(null)
+    val activeMission: StateFlow<ActiveMission?> = _activeMission
+
+    fun launchMission(
+        mission: com.hereliesaz.cleanunderwear.domain.BrowserMission,
+        onResult: (String?) -> Unit = {}
+    ) {
+        _activeMission.value = ActiveMission(mission, onResult)
+    }
+
+    fun completeMission(html: String?) {
+        val active = _activeMission.value
+        _activeMission.value = null
+        active?.onResult?.invoke(html)
+    }
+
+    fun cancelMission() {
+        completeMission(null)
+    }
 
     data class OperationState(
         val isRunning: Boolean = false,
@@ -287,11 +324,114 @@ class MainViewModel @Inject constructor(
 
     fun harvestFacebook() {
         viewModelScope.launch {
-            _operationState.value = OperationState(isRunning = true, description = "Interrogating Social Graph...", progress = -1f)
-            val fbFriends = fbHarvester.harvestFriends()
-            harvestContactsUseCase.processManualTargets(fbFriends)
-            _operationState.value = OperationState(isRunning = false)
+            pipelineCoordinator.runExclusive("facebook-harvest") {
+                _operationState.value = OperationState(
+                    isRunning = true,
+                    description = "Awaiting visible Facebook session...",
+                    progress = -1f
+                )
+                val html = launchMissionAndAwait(BrowserMission.HarvestFacebookFriends)
+                if (html.isNullOrBlank()) {
+                    _operationState.value = OperationState(isRunning = false)
+                    return@runExclusive
+                }
+                _operationState.value = _operationState.value.copy(
+                    description = "Parsing Facebook friend list..."
+                )
+                val friends = fbHarvester.parseFriendsHtml(html)
+                harvestContactsUseCase.processManualTargets(friends)
+                _operationState.value = OperationState(isRunning = false)
+            }
         }
+    }
+
+    /**
+     * Walks every UNVERIFIED contact and resolves their identity through the
+     * visible cyberbackgroundchecks browser flow, one mission at a time.
+     *
+     * Per the user's rule, this is *user-initiated*; the auto pipeline never
+     * triggers it. If the auto pipeline (or any other coordinator-protected
+     * job) is in flight, this batch queues until that finishes.
+     */
+    fun resolveUnverifiedBatch() {
+        viewModelScope.launch {
+            pipelineCoordinator.runExclusive("user-enrichment") {
+                val unverified = repository
+                    .getTargetWorkInfoPaged(limit = 5000, offset = 0)
+                    .filter { it.status == TargetStatus.UNVERIFIED }
+
+                if (unverified.isEmpty()) {
+                    _operationState.value = OperationState(
+                        isRunning = false,
+                        description = "No UNVERIFIED contacts queued."
+                    )
+                    return@runExclusive
+                }
+
+                val total = unverified.size
+                _operationState.value = OperationState(
+                    isRunning = true,
+                    description = "Resolving 1/$total via cyberbackgroundchecks...",
+                    progress = 0f
+                )
+
+                for ((index, lite) in unverified.withIndex()) {
+                    val target = repository.getTargetById(lite.id) ?: continue
+                    val mission = cbcEnricher.pickMission(target) ?: run {
+                        repository.updateMonitorabilityState(
+                            target.id,
+                            com.hereliesaz.cleanunderwear.data.MonitorabilityState.ENRICHMENT_FAILED
+                        )
+                        return@run null
+                    } ?: continue
+
+                    _operationState.value = OperationState(
+                        isRunning = true,
+                        description = "${index + 1}/$total · ${target.displayName} · ${mission.label}",
+                        progress = index.toFloat() / total
+                    )
+
+                    val html = launchMissionAndAwait(mission)
+                    if (html.isNullOrBlank()) {
+                        // User cancelled this row — stop the whole batch
+                        // rather than blow through every UNVERIFIED contact
+                        // without their attention.
+                        _operationState.value = OperationState(isRunning = false)
+                        return@runExclusive
+                    }
+
+                    val findings = cbcEnricher.parseFindings(html)
+                    if (findings != null) {
+                        val merged = cbcEnricher.merge(target, findings).copy(
+                            status = TargetStatus.MONITORING,
+                            monitorabilityState =
+                                com.hereliesaz.cleanunderwear.data.MonitorabilityState.READY
+                        )
+                        repository.updateTarget(merged)
+                    } else {
+                        repository.updateMonitorabilityState(
+                            target.id,
+                            com.hereliesaz.cleanunderwear.data.MonitorabilityState.ENRICHMENT_FAILED
+                        )
+                    }
+                }
+
+                _operationState.value = OperationState(
+                    isRunning = false,
+                    description = "Resolved $total UNVERIFIED contact${if (total == 1) "" else "s"}."
+                )
+            }
+        }
+    }
+
+    /**
+     * Launches a [BrowserMission] and suspends until BrowserScreen reports a
+     * result (user tapped Run Automation) or cancels (user tapped back / Done).
+     */
+    private suspend fun launchMissionAndAwait(mission: BrowserMission): String? {
+        val deferred = CompletableDeferred<String?>()
+        launchMission(mission) { html -> deferred.complete(html) }
+        return deferred.await()
     }
 
     fun harvestWhatsApp() {

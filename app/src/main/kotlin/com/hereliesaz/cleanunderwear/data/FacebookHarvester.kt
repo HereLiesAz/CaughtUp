@@ -1,55 +1,35 @@
 package com.hereliesaz.cleanunderwear.data
 
-import com.hereliesaz.cleanunderwear.network.WebViewScraper
 import com.hereliesaz.cleanunderwear.util.DiagnosticLogger
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Parses mbasic.facebook.com friend-list HTML into [Target] rows.
+ *
+ * The HTML must come from a *user-visible* WebView session
+ * ([com.hereliesaz.cleanunderwear.ui.BrowserScreen] driving
+ * [com.hereliesaz.cleanunderwear.domain.BrowserMission.HarvestFacebookFriends])
+ * — not from the covert WebView scraper. Facebook requires the user's real
+ * session cookies and frequently surfaces consent / login walls; only a real
+ * browser session reliably gets through.
+ */
 @Singleton
-class FacebookHarvester @Inject constructor(
-    private val scraper: WebViewScraper
-) {
-    /**
-     * mbasic emits server-rendered HTML pages without React; the friend list paginates via "See More"
-     * links. We click through pages by following the next cursor until it disappears, then dump.
-     */
-    private val INJECTION_SCRIPT = """
-        (function() {
-            async function followNext(maxPages) {
-                for (let i = 0; i < maxPages; i++) {
-                    const more = document.querySelector('a[href*="/friends/?"][href*="cursor"]')
-                        || document.querySelector('a[href*="/friends?"][href*="cursor"]')
-                        || Array.from(document.querySelectorAll('a')).find(a => /See more/i.test(a.textContent || ''));
-                    if (!more) break;
-                    const href = more.getAttribute('href');
-                    if (!href) break;
-                    try {
-                        const resp = await fetch(href, { credentials: 'include' });
-                        const html = await resp.text();
-                        document.body.insertAdjacentHTML('beforeend', html);
-                    } catch (e) { break; }
-                }
-                AndroidInterface.processHtml(document.documentElement.outerHTML);
-            }
-            followNext(20);
-        })();
-    """.trimIndent()
+class FacebookHarvester @Inject constructor() {
 
-    suspend fun harvestFriends(): List<Target> {
-        val html = scraper.scrapeWithInjection(
-            "https://mbasic.facebook.com/me/friends",
-            INJECTION_SCRIPT
-        ) ?: return emptyList()
-        return parseFriendsHtml(Jsoup.parse(html))
+    fun parseFriendsHtml(html: String): List<Target> {
+        if (html.isBlank()) return emptyList()
+        return parseFriendsDocument(Jsoup.parse(html))
     }
 
-    private fun parseFriendsHtml(doc: Document): List<Target> {
+    private fun parseFriendsDocument(doc: Document): List<Target> {
         val friends = mutableListOf<Target>()
 
-        // mbasic friend rows are anchors whose href points at the user's profile and whose text
-        // is the friend's display name. We exclude navigation chrome by ignoring known noise links.
+        // mbasic friend rows are anchors whose href points at the user's
+        // profile and whose text is the friend's display name. We exclude
+        // navigation chrome by ignoring known noise links.
         val noise = setOf(
             "Friends", "Mutual friends", "Followers", "Following",
             "See all", "See more", "Edit profile", "Home", "Menu"
@@ -76,7 +56,7 @@ class FacebookHarvester @Inject constructor(
         }
 
         val deduped = friends.distinctBy { it.displayName }
-        DiagnosticLogger.log("Facebook Harvest: Identified ${deduped.size} potential targets from social graph.")
+        DiagnosticLogger.log("Facebook Harvest: parsed ${deduped.size} friends from visible session.")
         return deduped
     }
 }
