@@ -17,16 +17,18 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.cleanunderwear.data.Target
 import com.hereliesaz.cleanunderwear.data.TargetStatus
+import com.hereliesaz.cleanunderwear.network.SourceCatalog
+import com.hereliesaz.cleanunderwear.network.SourceKind
 import com.hereliesaz.cleanunderwear.util.CyberBackgroundChecks
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TargetDetailScreen(
     target: Target,
+    sourceCatalog: SourceCatalog,
     onUpdateTarget: (Target) -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -61,11 +63,11 @@ fun TargetDetailScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            
+
             HorizontalDivider()
 
             DetailRow(label = "Intelligence Name", value = target.displayName)
-            
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
 
             target.phoneNumber?.let { DetailRow(label = "Contact Number", value = it) }
@@ -75,10 +77,10 @@ fun TargetDetailScreen(
                 DetailRow(label = "Known Home Area", value = target.residenceInfo)
             }
             DetailRow(
-                label = "Latest Status", 
+                label = "Latest Status",
                 value = target.status.name.lowercase().replaceFirstChar { it.uppercase() }
             )
-            
+
             val dateString = if (target.lastScrapedTimestamp > 0) {
                 SimpleDateFormat("MM/dd/yyyy hh:mm a", java.util.Locale.US)
                     .format(Date(target.lastScrapedTimestamp))
@@ -88,24 +90,35 @@ fun TargetDetailScreen(
             DetailRow(label = "Last Registry Check", value = dateString)
             DetailRow(label = "Found In", value = target.sourceAccount ?: "Unknown")
 
-            if (target.lockupUrl != null || target.obituaryUrl != null) {
+            // Verified evidence URL — only present when the stored URL came
+            // from the curated catalog AND the contact is in a status that
+            // implies a confirmed match. Search-engine URLs and stale entries
+            // never qualify.
+            val lockupEvidenceUrl = target.lockupUrl?.takeIf {
+                sourceCatalog.isFromCatalog(it) && target.status == TargetStatus.INCARCERATED
+            }
+            val obitEvidenceUrl = target.obituaryUrl?.takeIf {
+                sourceCatalog.isFromCatalog(it) && target.status == TargetStatus.DECEASED
+            }
+
+            if (lockupEvidenceUrl != null || obitEvidenceUrl != null) {
                 Text(
-                    text = "Verification Sources",
+                    text = "Verified Match Source",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                target.lockupUrl?.let { url ->
+                lockupEvidenceUrl?.let { url ->
                     AzButton(
-                        text = "Public Records / Roster",
+                        text = "Open Verified Roster Page",
                         onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = AzButtonShape.RECTANGLE
                     )
                 }
-                target.obituaryUrl?.let { url ->
+                obitEvidenceUrl?.let { url ->
                     AzButton(
-                        text = "Obituary Registry",
+                        text = "Open Verified Obituary Page",
                         onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = AzButtonShape.RECTANGLE
@@ -113,14 +126,52 @@ fun TargetDetailScreen(
                 }
             }
 
+            // UNVERIFIED status explainer. Tells the user why nothing's
+            // happening and offers to launch identity enrichment. The button
+            // is a placeholder until BrowserScreen lands; it currently routes
+            // to cyberbackgroundchecks via Intent.ACTION_VIEW so the user can
+            // resolve the contact manually if they want.
+            if (target.status == TargetStatus.UNVERIFIED) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Name needs first + last to be verifiable. " +
+                                "This contact is queued for identity enrichment via cyberbackgroundchecks.com.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AzButton(
+                            text = "Resolve Identity Now",
+                            onClick = {
+                                val url = target.phoneNumber?.let {
+                                    CyberBackgroundChecks.getPhoneSearchUrl(it)
+                                } ?: target.email?.let {
+                                    CyberBackgroundChecks.getEmailSearchUrl(it)
+                                } ?: target.residenceInfo?.let {
+                                    CyberBackgroundChecks.getAddressSearchUrl(it)
+                                } ?: CyberBackgroundChecks.getNameSearchUrl(target.displayName)
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = AzButtonShape.RECTANGLE
+                        )
+                    }
+                }
+            }
+
             HorizontalDivider()
-            
+
             Text(
                 text = "Check Frequency",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary
             )
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -161,7 +212,7 @@ fun TargetDetailScreen(
                         ) {
                             AzButton(
                                 text = "Incorrect Match",
-                                onClick = { 
+                                onClick = {
                                     onUpdateTarget(target.copy(
                                         status = TargetStatus.MONITORING,
                                         lastVerificationSnippet = null
@@ -172,7 +223,7 @@ fun TargetDetailScreen(
                             )
                             AzButton(
                                 text = "Confirm Match",
-                                onClick = { 
+                                onClick = {
                                     // Confirmed
                                 },
                                 modifier = Modifier.weight(1f),
@@ -184,9 +235,12 @@ fun TargetDetailScreen(
             }
 
             HorizontalDivider()
-            
+
+            // Manual Research — these all open in the user's browser. None of
+            // them write back to Target.lockupUrl / Target.obituaryUrl, so they
+            // can never be confused with verified evidence.
             Text(
-                text = "External Deep Interrogation",
+                text = "Manual Research",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -200,7 +254,7 @@ fun TargetDetailScreen(
                     onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getNameSearchUrl(target.displayName)))) },
                     label = { Text("Name Check") }
                 )
-                
+
                 target.phoneNumber?.let { phone ->
                     AssistChip(
                         onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CyberBackgroundChecks.getPhoneSearchUrl(phone)))) },
@@ -221,9 +275,24 @@ fun TargetDetailScreen(
                         label = { Text("Address Check") }
                     )
                 }
+
+                // Catalog-derived MANUAL_LANDING sources for this contact's
+                // locale (county sheriff, state DOC, VINELink, etc.) — clicking
+                // a chip opens the source's landing page in the user's browser.
+                val manualLockup = sourceCatalog
+                    .lockupSourcesFor(target.areaCode, target.residenceInfo)
+                    .filter { it.kind == SourceKind.MANUAL_LANDING }
+                manualLockup.forEach { source ->
+                    AssistChip(
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source.urlTemplate)))
+                        },
+                        label = { Text(source.label) }
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             AzButton(
                 text = "General News Search",
