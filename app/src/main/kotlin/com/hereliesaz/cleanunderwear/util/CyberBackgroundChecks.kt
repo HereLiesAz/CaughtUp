@@ -14,10 +14,18 @@ object CyberBackgroundChecks {
     }
 
     fun getPhoneSearchUrl(phone: String): String {
-        val digits = phone.filter { it.isDigit() }
+        var digits = phone.filter { it.isDigit() }
+        
+        // The country code 1 must be excluded for CBC phone searches.
+        if (digits.length == 11 && digits.startsWith("1")) {
+            digits = digits.substring(1)
+        }
+
         if (digits.length < 10) return "$BASE_URL/phone"
         
-        val formatted = "${digits.take(3)}-${digits.drop(3).take(3)}-${digits.takeLast(4)}"
+        // CBC expects 10 digits in XXX-XXX-XXXX format.
+        val last10 = digits.takeLast(10)
+        val formatted = "${last10.substring(0, 3)}-${last10.substring(3, 6)}-${last10.substring(6)}"
         return "$BASE_URL/phone/$formatted"
     }
 
