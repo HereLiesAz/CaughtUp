@@ -26,6 +26,33 @@ import javax.inject.Singleton
 class CyberBackgroundChecksEnricher @Inject constructor() {
 
     /**
+     * Every search this target supports, in priority order
+     * (phone → email → address → name). Empty list = caller marks the target
+     * ENRICHMENT_FAILED. The order is also the tiebreaker [mergeAll] uses
+     * when consensus across results is split.
+     */
+    fun pickAllMissions(target: Target): List<BrowserMission> = buildList {
+        target.phoneNumber
+            ?.filter { it.isDigit() }
+            ?.takeIf { it.length >= 10 }
+            ?.let { add(BrowserMission.CbcByPhone(it)) }
+
+        target.email
+            ?.takeIf { it.isNotBlank() && it.contains("@") }
+            ?.let { add(BrowserMission.CbcByEmail(it)) }
+
+        target.residenceInfo
+            ?.takeIf { it.isNotBlank() }
+            ?.let { add(BrowserMission.CbcByAddress(it)) }
+
+        val nameUsable = target.displayName.isNotBlank() &&
+            target.displayName != "Unnamed Entity" &&
+            !target.displayName.startsWith("Unnamed Entity (") &&
+            target.displayName.split(" ").size >= 2
+        if (nameUsable) add(BrowserMission.CbcByName(target.displayName))
+    }
+
+    /**
      * Returns the most-precise mission this target supports, or null if none
      * of the four search inputs are present (caller should mark the target
      * ENRICHMENT_FAILED).
@@ -106,5 +133,79 @@ class CyberBackgroundChecksEnricher @Inject constructor() {
         return merged
     }
 
+    /**
+     * Folds findings from every search method into [target]. Consensus wins —
+     * a value seen in more results beats one seen in fewer. Ties break on
+     * source priority (phone > email > address > name), matching the order
+     * returned by [pickAllMissions].
+     *
+     * As with [merge], existing target fields are preserved — enrichment
+     * only fills gaps, it doesn't trample user-edited data.
+     */
+    fun mergeAll(target: Target, results: List<Pair<BrowserMission, Findings>>): Target {
+        fun priorityOf(m: BrowserMission): Int = when (m) {
+            is BrowserMission.CbcByPhone -> 4
+            is BrowserMission.CbcByEmail -> 3
+            is BrowserMission.CbcByAddress -> 2
+            is BrowserMission.CbcByName -> 1
+            else -> 0
+        }
+
+        fun <T : Any> consensus(extract: (Findings) -> T?): T? {
+            val grouped = results.mapNotNull { (m, f) ->
+                extract(f)?.let { it to priorityOf(m) }
+            }.groupBy({ it.first }, { it.second })
+            return grouped.entries.maxWithOrNull(
+                compareBy<Map.Entry<T, List<Int>>> { it.value.size }
+                    .thenBy { it.value.max() }
+            )?.key
+        }
+
+        val name = consensus { it.name }
+        val address = consensus { it.address }
+        val phone = consensus { it.phone }
+
+        val nameWasPlaceholder = target.displayName.isBlank() ||
+            target.displayName == "Unnamed Entity" ||
+            target.displayName.startsWith("Unnamed Entity (")
+
+        val merged = target.copy(
+            displayName = if (nameWasPlaceholder && name != null) name else target.displayName,
+            phoneNumber = target.phoneNumber ?: phone,
+            residenceInfo = target.residenceInfo ?: address,
+            areaCode = target.areaCode ?: phone?.filter { it.isDigit() }?.takeLast(10)?.take(3),
+        )
+        DiagnosticLogger.log("CYBG mergeAll: ${target.displayName} → ${merged.displayName} (${results.size} sources)")
+        return merged
+    }
+
+    /**
+     * Coarse heuristic: returns true when the page HTML smells like a captcha,
+     * anti-bot wall, or completely empty body. BrowserScreen uses this to
+     * decide when to surface the "human, please help" pause overlay.
+     *
+     * Conservative on purpose — false negatives (page looks fine, parser
+     * finds nothing) are also handled by [parseFindings] returning null,
+     * which the viewmodel records as a per-search miss without halting the
+     * whole queue.
+     */
+    fun looksLikeBlock(html: String): Boolean {
+        if (html.isBlank()) return true
+        val lower = html.lowercase()
+        return BLOCK_MARKERS.any { it in lower }
+    }
+
     data class Findings(val name: String?, val address: String?, val phone: String?)
+
+    private companion object {
+        private val BLOCK_MARKERS = listOf(
+            "captcha",
+            "are you a robot",
+            "verify you are human",
+            "unusual traffic",
+            "access denied",
+            "cf-browser-verification",
+            "/cdn-cgi/challenge",
+        )
+    }
 }

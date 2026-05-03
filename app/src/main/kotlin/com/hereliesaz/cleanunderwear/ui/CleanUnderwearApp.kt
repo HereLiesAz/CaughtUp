@@ -211,13 +211,19 @@ fun CleanUnderwearApp(viewModel: MainViewModel) {
             // WebView screen takes over the whole content area. This honors
             // the rule that cyberbackgroundchecks / Facebook flows must use
             // the user's real session, not a covert WebView.
-            val activeMission by viewModel.activeMission.collectAsState()
-            val mission = activeMission
-            if (mission != null) {
+            val activeBatch by viewModel.activeMissionBatch.collectAsState()
+            val batch = activeBatch
+            if (batch != null) {
                 BrowserScreen(
-                    mission = mission.mission,
-                    onComplete = { html -> viewModel.completeMission(html) },
-                    onCancel = { viewModel.cancelMission() }
+                    missions = batch.missions,
+                    onMissionResult = { mission, outcome ->
+                        if (outcome is MissionOutcome.Extracted) {
+                            batch.onMissionExtracted(mission, outcome.html)
+                        }
+                    },
+                    onAllComplete = { viewModel.completeMissionBatch() },
+                    onCancel = { viewModel.cancelMissionBatch() },
+                    isBlocked = batch.isBlocked,
                 )
                 return@onscreen
             }

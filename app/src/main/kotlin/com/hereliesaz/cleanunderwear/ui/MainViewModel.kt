@@ -121,35 +121,79 @@ class MainViewModel @Inject constructor(
     val showManualEntryDialog: StateFlow<Boolean> = _showManualEntryDialog
 
     /**
-     * The browser mission currently being shown to the user, if any. When
-     * non-null, the UI overlays [com.hereliesaz.cleanunderwear.ui.BrowserScreen]
-     * over the rest of the app. The result handler is captured so the caller
-     * (e.g. the "Resolve Identity Now" button on TargetDetailScreen) can
-     * react to whatever HTML the BrowserScreen extracts.
+     * The browser mission queue currently being shown to the user, if any.
+     * When non-null, the UI overlays [com.hereliesaz.cleanunderwear.ui.BrowserScreen]
+     * over the rest of the app. Single-mission flows (Facebook harvest, the
+     * manual "Research" buttons in TargetDetailScreen) reuse this state via
+     * [launchMission], which wraps the mission as a singleton list.
+     *
+     * `onMissionExtracted` fires once per page that produced HTML. `onCancel`
+     * fires if the user backs out before the queue finishes. `onAllComplete`
+     * fires once after the last mission resolves (extracted or skipped).
      */
-    data class ActiveMission(
-        val mission: com.hereliesaz.cleanunderwear.domain.BrowserMission,
-        val onResult: (String?) -> Unit
+    data class ActiveMissionBatch(
+        val missions: List<com.hereliesaz.cleanunderwear.domain.BrowserMission>,
+        val onMissionExtracted: (com.hereliesaz.cleanunderwear.domain.BrowserMission, String) -> Unit,
+        val onAllComplete: () -> Unit,
+        val onCancel: () -> Unit,
+        val isBlocked: (String) -> Boolean,
     )
 
-    private val _activeMission = MutableStateFlow<ActiveMission?>(null)
-    val activeMission: StateFlow<ActiveMission?> = _activeMission
+    private val _activeMissionBatch = MutableStateFlow<ActiveMissionBatch?>(null)
+    val activeMissionBatch: StateFlow<ActiveMissionBatch?> = _activeMissionBatch
 
+    /**
+     * Queues a list of missions for the visible BrowserScreen. The screen
+     * loads each URL in order, auto-extracts on settle, and advances. See
+     * [ActiveMissionBatch] for callback semantics.
+     */
+    fun launchMissionQueue(
+        missions: List<com.hereliesaz.cleanunderwear.domain.BrowserMission>,
+        onMissionExtracted: (com.hereliesaz.cleanunderwear.domain.BrowserMission, String) -> Unit = { _, _ -> },
+        onAllComplete: () -> Unit = {},
+        onCancel: () -> Unit = {},
+        isBlocked: (String) -> Boolean = { false },
+    ) {
+        _activeMissionBatch.value = ActiveMissionBatch(
+            missions = missions,
+            onMissionExtracted = onMissionExtracted,
+            onAllComplete = onAllComplete,
+            onCancel = onCancel,
+            isBlocked = isBlocked,
+        )
+    }
+
+    /**
+     * Single-mission convenience wrapper that preserves the older
+     * `(html: String?) -> Unit` callback shape (null = user cancelled,
+     * non-null = extracted HTML). Used by Facebook harvest and the
+     * TargetDetailScreen "Research" buttons.
+     */
     fun launchMission(
         mission: com.hereliesaz.cleanunderwear.domain.BrowserMission,
         onResult: (String?) -> Unit = {}
     ) {
-        _activeMission.value = ActiveMission(mission, onResult)
+        var captured: String? = null
+        launchMissionQueue(
+            missions = listOf(mission),
+            onMissionExtracted = { _, html -> captured = html },
+            onAllComplete = { onResult(captured) },
+            onCancel = { onResult(null) },
+        )
     }
 
-    fun completeMission(html: String?) {
-        val active = _activeMission.value
-        _activeMission.value = null
-        active?.onResult?.invoke(html)
+    /** Called by the UI when the mission queue finishes naturally. */
+    fun completeMissionBatch() {
+        val active = _activeMissionBatch.value
+        _activeMissionBatch.value = null
+        active?.onAllComplete?.invoke()
     }
 
-    fun cancelMission() {
-        completeMission(null)
+    /** Called by the UI when the user backs out of the queue. */
+    fun cancelMissionBatch() {
+        val active = _activeMissionBatch.value
+        _activeMissionBatch.value = null
+        active?.onCancel?.invoke()
     }
 
     data class OperationState(
@@ -377,42 +421,46 @@ class MainViewModel @Inject constructor(
 
                 for ((index, lite) in unverified.withIndex()) {
                     val target = repository.getTargetById(lite.id) ?: continue
-                    val mission = cbcEnricher.pickMission(target) ?: run {
+                    val missions = cbcEnricher.pickAllMissions(target)
+                    if (missions.isEmpty()) {
                         repository.updateMonitorabilityState(
                             target.id,
                             com.hereliesaz.cleanunderwear.data.MonitorabilityState.ENRICHMENT_FAILED
                         )
-                        return@run null
-                    } ?: continue
+                        continue
+                    }
 
                     _operationState.value = OperationState(
                         isRunning = true,
-                        description = "${index + 1}/$total · ${target.displayName} · ${mission.label}",
+                        description = "${index + 1}/$total · ${target.displayName} · ${missions.size} search${if (missions.size == 1) "" else "es"}",
                         progress = index.toFloat() / total
                     )
 
-                    val html = launchMissionAndAwait(mission)
-                    if (html.isNullOrBlank()) {
-                        // User cancelled this row — stop the whole batch
-                        // rather than blow through every UNVERIFIED contact
+                    val collected = mutableListOf<Pair<BrowserMission, com.hereliesaz.cleanunderwear.network.CyberBackgroundChecksEnricher.Findings>>()
+                    val outcome = launchMissionsAndAwait(missions) { mission, html ->
+                        cbcEnricher.parseFindings(html)?.let { collected.add(mission to it) }
+                    }
+
+                    if (outcome == BatchOutcome.UserCancelled) {
+                        // User backed out mid-target — stop the whole batch
+                        // rather than barrel through every UNVERIFIED contact
                         // without their attention.
                         _operationState.value = OperationState(isRunning = false)
                         return@runExclusive
                     }
 
-                    val findings = cbcEnricher.parseFindings(html)
-                    if (findings != null) {
-                        val merged = cbcEnricher.merge(target, findings).copy(
+                    if (collected.isEmpty()) {
+                        repository.updateMonitorabilityState(
+                            target.id,
+                            com.hereliesaz.cleanunderwear.data.MonitorabilityState.ENRICHMENT_FAILED
+                        )
+                    } else {
+                        val merged = cbcEnricher.mergeAll(target, collected).copy(
                             status = TargetStatus.MONITORING,
                             monitorabilityState =
                                 com.hereliesaz.cleanunderwear.data.MonitorabilityState.READY
                         )
                         repository.updateTarget(merged)
-                    } else {
-                        repository.updateMonitorabilityState(
-                            target.id,
-                            com.hereliesaz.cleanunderwear.data.MonitorabilityState.ENRICHMENT_FAILED
-                        )
                     }
                 }
 
@@ -426,11 +474,36 @@ class MainViewModel @Inject constructor(
 
     /**
      * Launches a [BrowserMission] and suspends until BrowserScreen reports a
-     * result (user tapped Run Automation) or cancels (user tapped back / Done).
+     * result (auto-extracted) or cancels (user tapped back / Done). Single-
+     * mission flows still use this; the batch enricher uses
+     * [launchMissionsAndAwait].
      */
     private suspend fun launchMissionAndAwait(mission: BrowserMission): String? {
         val deferred = CompletableDeferred<String?>()
         launchMission(mission) { html -> deferred.complete(html) }
+        return deferred.await()
+    }
+
+    private enum class BatchOutcome { Completed, UserCancelled }
+
+    /**
+     * Launches a queue of missions in the visible BrowserScreen and suspends
+     * until the queue completes or the user cancels. [onEachExtracted] is
+     * invoked per page that produced HTML; the suspend value indicates
+     * whether the queue ran to completion.
+     */
+    private suspend fun launchMissionsAndAwait(
+        missions: List<BrowserMission>,
+        onEachExtracted: (BrowserMission, String) -> Unit,
+    ): BatchOutcome {
+        val deferred = CompletableDeferred<BatchOutcome>()
+        launchMissionQueue(
+            missions = missions,
+            onMissionExtracted = onEachExtracted,
+            onAllComplete = { deferred.complete(BatchOutcome.Completed) },
+            onCancel = { deferred.complete(BatchOutcome.UserCancelled) },
+            isBlocked = cbcEnricher::looksLikeBlock,
+        )
         return deferred.await()
     }
 
